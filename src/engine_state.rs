@@ -1,68 +1,81 @@
-use std::sync::Arc;
-use std::time::{SystemTime, Duration};
-use tokio::net::UdpSocket as TokioUdpSocket;
+use crate::data_types::{BroadcastStats, EngineState, MESSAGE_TOTAL_SIZE};
+use crate::message_codec;
 
-use crate::data_types::*;
-use crate::message_codec; 
+use tokio::net::UdpSocket;
+use tokio::time::{self, Duration};
+
+use std::net::SocketAddr;
+use std::sync::Arc;
 
 impl EngineState {
-    pub fn new(product_id: u16, broadcast_socket: Arc<TokioUdpSocket>, multicast_addr: String) -> Self {
-        let now_nanos = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap_or(Duration::from_nanos(0))
-            .as_nanos() as u64;
+    /// Creates a new EngineState instance with initialized components.
+    pub fn new(
+        instance_tag: [u8; 8],
+        product_id: u16,
+        trade_multicast_addr: SocketAddr,
+        status_multicast_addr: SocketAddr,
+    ) -> Self {
+        let now_nanos = time::Instant::now().elapsed().as_nanos() as u64;
 
         EngineState {
+            instance_tag,
             product_id,
             order_book: Arc::new(tokio::sync::Mutex::new(Vec::new())),
             matched_orders: Arc::new(tokio::sync::Mutex::new(0)),
             total_received_orders: Arc::new(tokio::sync::Mutex::new(0)),
             start_time: now_nanos,
-            broadcast_socket,
-            multicast_addr,
+            trade_multicast_addr,
+            status_multicast_addr,
         }
     }
-    
-    // 广播引擎状态统计信息
-    pub async fn broadcast_stats(&self) {
-        // 必须先获取订单簿的锁来获取当前大小
-        let book_guard = self.order_book.lock().await;
-        let order_book_size = book_guard.len() as u64;
-        // 释放 book_guard，以便其他任务可以访问
-        drop(book_guard); 
 
-        let matched_count_guard = self.matched_orders.lock().await;
-        let received_count_guard = self.total_received_orders.lock().await;
-        
-        let stats = BroadcastStats {
-            product_id: self.product_id,
-            order_book_size, // New field
-            matched_orders: *matched_count_guard,
-            total_received_orders: *received_count_guard,
-            start_time: self.start_time,
-        };
-
-        let message = message_codec::serialize_stats_result(&stats);
-
-        if let Err(e) = self.broadcast_socket.send_to(&message, &self.multicast_addr).await {
-            eprintln!("[STATE] Failed to broadcast stats: {}", e);
-        } else {
-            println!("[STATE] Broadcasted stats: Book Size={}, Matched={}, Received={}", 
-                stats.order_book_size, stats.matched_orders, stats.total_received_orders);
-        }
+    /// Creates a self-contained handler for status broadcasting logic.
+    pub fn new_status_broadcaster(
+        state: Arc<EngineState>,
+        socket: Arc<UdpSocket>,
+    ) -> StatusBroadcaster {
+        StatusBroadcaster { state, socket }
     }
 }
 
-// impl Clone for EngineState {
-//     fn clone(&self) -> Self {
-//         EngineState {
-//             product_id: self.product_id,
-//             order_book: Arc::clone(&self.order_book),
-//             matched_orders: Arc::clone(&self.matched_orders),
-//             total_received_orders: Arc::clone(&self.total_received_orders),
-//             start_time: self.start_time,
-//             broadcast_socket: Arc::clone(&self.broadcast_socket),
-//             multicast_addr: self.multicast_addr.clone(),
-//         }
-//     }
-// }
+/// Handler responsible for periodically broadcasting the engine's current state/stats.
+pub struct StatusBroadcaster {
+    state: Arc<EngineState>,
+    socket: Arc<UdpSocket>,
+}
+
+impl StatusBroadcaster {
+    /// Runs the periodic status broadcast loop.
+    pub async fn run_status_broadcast(&self) {
+        let mut interval = time::interval(Duration::from_secs(1));
+        
+        let addr = self.state.status_multicast_addr;
+        println!("Status broadcaster started. Target address: {}", addr);
+
+        loop {
+            // Wait for the next tick
+            interval.tick().await;
+
+            // 1. Lock necessary shared data
+            let order_book = self.state.order_book.lock().await;
+            let matched_orders = self.state.matched_orders.lock().await;
+            let total_received_orders = self.state.total_received_orders.lock().await;
+
+            // 2. Construct the stats message
+            let stats = BroadcastStats {
+                instance_tag: self.state.instance_tag,
+                product_id: self.state.product_id,
+                order_book_size: order_book.len() as u64,
+                matched_orders: *matched_orders,
+                total_received_orders: *total_received_orders,
+                start_time: self.state.start_time,
+            };
+
+            // 3. Serialize and send
+            let buf: [u8; MESSAGE_TOTAL_SIZE] = message_codec::serialize_stats_result(&stats);
+            if let Err(e) = self.socket.send_to(&buf, addr).await {
+                eprintln!("Error sending status broadcast: {}", e);
+            }
+        }
+    }
+}

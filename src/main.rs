@@ -1,95 +1,176 @@
-// 声明 modules
+use std::net::ToSocketAddrs;
+use std::sync::Arc;
+
+mod broadcast_handler;
 mod data_types;
 mod engine_state;
+mod message_codec;
 mod network_handler;
 mod order_matcher;
-mod broadcast_handler; 
-mod message_codec; 
 
-use std::net::Ipv4Addr;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::net::UdpSocket as TokioUdpSocket;
-use tokio::sync::mpsc;
-use tokio::task;
-
-use data_types::{MatchResult}; // 引入 IncomingMessage
-use crate::data_types::*;
+use broadcast_handler::BroadcastHandler;
+use data_types::{EngineState, IncomingMessage,MatchResult};
+use engine_state::StatusBroadcaster;
 use network_handler::NetworkHandler;
 use order_matcher::OrderMatcher;
-use broadcast_handler::BroadcastHandler; 
+
+use tokio::net::UdpSocket;
+use tokio::sync::mpsc;
+
+const DEFAULT_TRADE_ADDR: &str = "239.0.0.1:5000";
+const DEFAULT_STATUS_ADDR: &str = "239.0.0.2:5001";
+const DEFAULT_BIND_ADDR: &str = "0.0.0.0:0"; // Bind to all interfaces, OS chooses port
+
+/// Parses configuration from command line arguments or environment variables.
+fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAddr), String> {
+    let args: Vec<String> = std::env::args().collect();
+    let mut instance_name = None;
+    let mut product_id = None;
+    let mut trade_addr_str = None;
+    let mut status_addr_str = None;
+
+    // Command Line Arguments Parsing
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--name" => {
+                if i + 1 < args.len() {
+                    instance_name = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            "--prodid" => {
+                if i + 1 < args.len() {
+                    product_id = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            "--trade-addr" => {
+                if i + 1 < args.len() {
+                    trade_addr_str = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            "--status-addr" => {
+                if i + 1 < args.len() {
+                    status_addr_str = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    // 1. Instance Name (Tag)
+    let tag_string = instance_name
+        .or_else(|| std::env::var("INST_NAME").ok())
+        .unwrap_or_else(|| "DEFAULT".to_string());
+
+    if tag_string.len() > 8 {
+        return Err(format!(
+            "Instance tag '{}' exceeds maximum length of 8 characters.",
+            tag_string
+        ));
+    }
+
+    // 2. Product ID
+    let prod_id_str = product_id.ok_or_else(|| {
+        "Missing required argument: --prodid. Also check env var PROD_ID.".to_string()
+    })?;
+    let prod_id: u16 = prod_id_str.parse().map_err(|_| {
+        format!("Invalid product ID format: '{}'. Must be a valid u16.", prod_id_str)
+    })?;
+
+    // 3. Multicast Addresses
+    let trade_addr: std::net::SocketAddr = trade_addr_str
+        .unwrap_or_else(|| DEFAULT_TRADE_ADDR.to_string())
+        .to_socket_addrs()
+        .map_err(|e| format!("Invalid trade address: {}", e))?
+        .next()
+        .ok_or_else(|| "Could not parse trade address.".to_string())?;
+
+    let status_addr: std::net::SocketAddr = status_addr_str
+        .unwrap_or_else(|| DEFAULT_STATUS_ADDR.to_string())
+        .to_socket_addrs()
+        .map_err(|e| format!("Invalid status address: {}", e))?
+        .next()
+        .ok_or_else(|| "Could not parse status address.".to_string())?;
+
+    Ok((tag_string, prod_id, trade_addr, status_addr))
+}
+
+/// Utility function to convert String tag to fixed-size [u8; 8] array.
+fn tag_to_u8_array(tag: &str) -> [u8; 8] {
+    let mut tag_array = [0u8; 8];
+    let bytes = tag.as_bytes();
+    let len = std::cmp::min(bytes.len(), 8);
+    tag_array[..len].copy_from_slice(&bytes[..len]);
+    tag_array
+}
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    // 1. 初始化核心状态和通道
-    let multicast_addr = "224.0.0.1:5000";
-    
-    // 消息接收 -> 撮合处理 通道 (现在发送 IncomingMessage)
-    let (message_tx, message_rx) = mpsc::channel(1000); 
-    
-    // 撮合处理 -> 广播发送 通道
-    let (match_tx, match_rx) = mpsc::channel::<MatchResult>(1000); 
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Starting Lighting Match Engine Core...");
 
-    println!("Starting matching engine on {}...", multicast_addr);
-
-    // 2. 初始化网络 Socket
-    let (ip_str, port_str) = multicast_addr
-        .split_once(':')
-        .ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid multicast group format")
-        })?;
-    let port: u16 = port_str.parse().map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("Invalid port: {}", e))
-    })?;
-    let multicast_ip: Ipv4Addr = ip_str.parse().map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("Invalid IP: {}", e))
-    })?;
-
-    // 绑定并加入多播组 (用于接收和发送)
-    let socket = TokioUdpSocket::bind(format!("0.0.0.0:{}", port)).await?;
-    socket.join_multicast_v4(multicast_ip, Ipv4Addr::new(0, 0, 0, 0))?;
-    let socket_arc = Arc::new(socket); 
-    
-    // 实例化 EngineState，传入 Socket 和地址
-    let engine_state = EngineState::new(1, socket_arc.clone(), multicast_addr.to_string()); 
-
-    // 3. 创建各个处理器实例
-    let network_handler = NetworkHandler::new(socket_arc.clone(), message_tx, engine_state.clone());
-    let order_matcher = OrderMatcher::new(engine_state.clone(), match_tx); 
-    let broadcast_handler = BroadcastHandler::new(socket_arc.clone(), multicast_addr.to_string()); 
-
-    // 4. 启动任务
-    
-    // 任务 1: 消息接收 (Message Receive)
-    let receive_task = task::spawn(async move {
-        network_handler.receive_messages().await; 
-    });
-
-    // 任务 2: 撮合处理 (Order Matching)
-    let process_task = task::spawn(async move {
-        order_matcher.process_orders(message_rx).await;
-    });
-
-    // 任务 3: 统计广播 (Status Broadcast)
-    let stats_task = task::spawn(async move {
-        loop {
-            engine_state.broadcast_stats().await;
-            tokio::time::sleep(Duration::from_secs(10)).await;
+    // 1. Get configuration
+    let (tag_string, prod_id, trade_addr, status_addr) = match get_config() {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Configuration Error: {}", e);
+            eprintln!("Usage: --name <tag_8_chars_max> --prodid <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]");
+            return Err(e.into());
         }
-    });
+    };
 
-    // 任务 4: 成交广播 (Trade Broadcast)
-    let broadcast_task = task::spawn(async move {
-        broadcast_handler.start_broadcasting(match_rx).await;
-    });
+    let instance_tag_bytes = tag_to_u8_array(&tag_string);
 
-    // 等待任务完成
+    println!("Configuration Loaded:");
+    println!("  Instance Tag: {}", tag_string);
+    println!("  Product ID: {}", prod_id);
+    println!("  Trade Multicast: {}", trade_addr);
+    println!("  Status Multicast: {}", status_addr);
+    println!("--------------------------------------------------");
+
+    // 2. Initialize Sockets
+    // NOTE: In a real system, you'd configure the input socket for the specific port/interface it needs to bind to.
+    let input_socket = UdpSocket::bind(DEFAULT_BIND_ADDR).await?;
+    let shared_input_socket = Arc::new(input_socket);
+
+    // Broadcast socket needs to be bound to a local address suitable for sending to multicast.
+    let broadcast_socket = UdpSocket::bind(DEFAULT_BIND_ADDR).await?;
+    broadcast_socket.set_multicast_ttl_v4(64)?;
+    let shared_broadcast_socket = Arc::new(broadcast_socket);
+
+    // 3. Initialize Engine State
+    let engine_state = Arc::new(EngineState::new(
+        instance_tag_bytes,
+        prod_id,
+        trade_addr,
+        status_addr,
+    ));
+
+    // 4. Initialize Channels
+    // Channel for incoming messages (Network -> Matcher)
+    let (message_tx, message_rx) = mpsc::channel::<IncomingMessage>(1024);
+    // Channel for matched trades (Matcher -> Broadcast)
+    let (match_tx, match_rx) = mpsc::channel::<MatchResult>(1024);
+
+    // 5. Initialize Handlers
+    // FIX for E0596: All handlers must be declared as mutable to call run_*_loop methods.
+    let mut network_handler = NetworkHandler::new(shared_input_socket.clone(), message_tx, engine_state.clone());
+    let mut order_matcher = OrderMatcher::new(message_rx, match_tx, engine_state.clone());
+    let mut broadcast_handler = BroadcastHandler::new(shared_broadcast_socket.clone(), engine_state.trade_multicast_addr, match_rx);
+    let status_broadcaster = EngineState::new_status_broadcaster(engine_state.clone(), shared_broadcast_socket.clone());
+
+    // 6. Run all tasks concurrently
+    // Note: status_broadcaster is a structure implementing an async method, which is run via tokio::spawn
     tokio::select! {
-        _ = receive_task => println!("Receive task finished."),
-        _ = process_task => println!("Process task finished."),
-        _ = stats_task => println!("Stats task finished."),
-        _ = broadcast_task => println!("Broadcast task finished."), 
+        _ = network_handler.run_receive_loop() => { println!("Network receiver exited."); }
+        _ = order_matcher.run_matching_loop() => { println!("Order matcher exited."); }
+        _ = broadcast_handler.run_broadcast_loop() => { println!("Broadcast handler exited."); }
+        _ = status_broadcaster.run_status_broadcast() => { println!("Status broadcaster exited."); }
     }
-    
+
     Ok(())
 }

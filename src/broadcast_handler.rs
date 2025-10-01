@@ -1,38 +1,44 @@
+use crate::data_types::{MatchResult, MESSAGE_TOTAL_SIZE};
+use crate::message_codec;
+
+use tokio::net::UdpSocket;
+use tokio::sync::mpsc::Receiver;
+
+use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::UdpSocket as TokioUdpSocket;
-use tokio::sync::mpsc;
 
-use crate::data_types::MatchResult;
-use crate::message_codec; // 引入 Codec
-
+/// Handler responsible for sending out matched trade results.
 pub struct BroadcastHandler {
-    socket: Arc<TokioUdpSocket>,
-    multicast_addr: String,
+    socket: Arc<UdpSocket>,
+    trade_multicast_addr: SocketAddr,
+    receiver: Receiver<MatchResult>,
 }
 
 impl BroadcastHandler {
-    pub fn new(socket: Arc<TokioUdpSocket>, multicast_addr: String) -> Self {
+    /// Creates a new BroadcastHandler.
+    pub fn new(
+        socket: Arc<UdpSocket>,
+        trade_multicast_addr: SocketAddr,
+        receiver: Receiver<MatchResult>,
+    ) -> Self {
         BroadcastHandler {
             socket,
-            multicast_addr,
+            trade_multicast_addr,
+            receiver,
         }
     }
 
-    pub async fn start_broadcasting(
-        &self,
-        mut rx: mpsc::Receiver<MatchResult>,
-    ) {
-        while let Some(result) = rx.recv().await {
-            // 序列化成交结果
-            let message = message_codec::serialize_match_result(&result);
+    /// Runs the main loop to listen for MatchResults and broadcast them.
+    pub async fn run_broadcast_loop(&mut self) {
+        println!("Trade broadcaster started. Target address: {}", self.trade_multicast_addr);
+        while let Some(result) = self.receiver.recv().await {
+            // Serialize the MatchResult into the fixed 50-byte buffer
+            let buf: [u8; MESSAGE_TOTAL_SIZE] = message_codec::serialize_match_result(&result);
 
-            // 广播成交信息
-            if let Err(e) = self.socket.send_to(&message, &self.multicast_addr).await {
-                eprintln!("[BROADCAST] Failed to send trade broadcast: {}", e);
-            } else {
-                println!("[BROADCAST] Sent trade result: {:?}", result);
+            // Send the binary data to the dedicated trade multicast address
+            if let Err(e) = self.socket.send_to(&buf, self.trade_multicast_addr).await {
+                eprintln!("Error sending trade broadcast: {}", e);
             }
         }
-        println!("[BROADCAST] Broadcast handler stopped.");
     }
 }
