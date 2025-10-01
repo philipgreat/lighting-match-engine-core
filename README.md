@@ -1,4 +1,4 @@
-# Ligting Match Engine Core
+# Lighting Match Engine Core
 
 A minized lighting fast matching engine core, focusing on mathing only.
 No assumptions, work with different assets with max 65535 assets
@@ -100,7 +100,7 @@ What is IN scope
 
 ## Contact
 
-Telegram： https://t.me/philip_is_online
+* Telegram： https://t.me/philip_is_online
 
 
 
