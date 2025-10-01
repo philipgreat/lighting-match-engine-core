@@ -1,7 +1,11 @@
 # Lighting Match Engine Core
 
+**RUST IS BORN for MATCHING ENGINES** 
+
 A minized lighting fast matching engine core, focusing on mathing only.
 No assumptions, work with different assets with max 65535 assets
+
+
 
 ## In scope and NOT in scope
 
@@ -101,6 +105,3 @@ What is IN scope
 ## Contact
 
 * Telegram： https://t.me/philip_is_online
-
-
-
