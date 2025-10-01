@@ -107,7 +107,7 @@ External systems you may need and NOT in scope
 
 ## License
 
-MIT License[LICENSE](./LICENSE.md)
+[MIT License](./LICENSE.md)
 
 ## Contact
 
