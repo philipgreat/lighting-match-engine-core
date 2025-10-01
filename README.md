@@ -83,7 +83,7 @@ What is IN scope
 * Test match
 * Broadcasting matching result
 
-## Files
+## Source Files
 
 * main.rs: the entry point
 * network_handler: handling communication
@@ -97,3 +97,10 @@ What is IN scope
 
 * UDP: getting orders, broading casting engine stats
 * TCP: use for order book rebuilding only
+
+## Contact
+
+Find https://t.me/philip_is_online
+
+
+
