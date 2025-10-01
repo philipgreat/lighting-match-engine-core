@@ -70,6 +70,11 @@ No assumptions, work with different assets with max 65535 assets
 * UDP: getting orders, broading casting engine stats
 * TCP: use for order book rebuilding only
 
+## Deployment
+
+* In a network supporting multicasting
+* Docker: with --network host
+* Kubernates: [Config k8s](./docs/config-k8s-network.md)
 
 ## In scope and NOT in scope
 
@@ -106,4 +111,4 @@ What is IN scope
 
 ## Contact
 
-* Telegram： https://t.me/philip_is_online
+* Telegram: https://t.me/philip_is_online
