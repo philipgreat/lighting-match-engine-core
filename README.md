@@ -41,7 +41,7 @@ All the products can be encoded as a number less than 65535, 0 is reseve for onl
 * No remote cache
 * No JSON
 * No file reading/writes
-* No computing with strings, floats, only intergral types
+* No computing with strings, floats, only integeral types
 * Purely in memory except rebuild the order book
 * Recieving orders by UDP multicast
 * Keep code lines less than 2000 （now it is 500）
