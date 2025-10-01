@@ -20,11 +20,7 @@ Products can be:
 
 All the products can be encoded as a number less than 65535, 0 is reseve for online testing
 
-## Limitations
 
-* Max 65535 products
-* Price from 0 to 2**64
-* Order id from 0 to 2**64
 
 ## Order types
 
@@ -119,6 +115,12 @@ External systems you may need and NOT in scope
 * Security and Authentication System: Protects the trading platform and user data by enforcing security protocols, such as encryption and two-factor authentication.
 
 * Payment and Wallet System (For Cryptocurrency): Manages deposits, withdrawals, and balances for digital assets, ensuring smooth transactions in cryptocurrency exchanges.
+
+## Limitations
+
+* Max 65535 products
+* Price from 0 to 2**64
+* Order id from 0 to 2**64
 
 ## License
 
