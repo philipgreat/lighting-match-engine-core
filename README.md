@@ -33,7 +33,7 @@ External systems you may need and NOT in scope
 
 What is IN scope
 
-A simple, robust system handling large orderbook process need many external tools to work with
+* A SIMPLE, ROBUST system handling large orderbook process need many external tools to work with
 
 ## Limitations
 
