@@ -100,7 +100,7 @@ What is IN scope
 
 ## Contact
 
-Find https://t.me/philip_is_online
+Telegram： https://t.me/philip_is_online
 
 
 
