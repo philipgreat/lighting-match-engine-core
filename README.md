@@ -3,7 +3,7 @@
 **RUST IS BORN for MATCHING ENGINES**
 
 A minized lighting fast matching engine core, focusing on mathing only.
-No assumptions, work with different assets with max 65535 products.
+No assumptions, work with different products with max 65535.
 
 Products can be:
 
@@ -102,6 +102,12 @@ Note: The instance tag (--name) must be 8 characters or less.
 * Docker: with --network host
 * Kubernates: [Config k8s](./docs/config-k8s-network.md)
 
+## SDK & Testing tool
+
+We are planning to build Java and Rust sdk. Currently not availiable yet.
+
+Testbench is WIP.
+
 ## In scope and NOT in scope
 
 This is not subject to do everyting, the secrets of fast and reliable is KISS(simple and stupid)
@@ -147,3 +153,4 @@ External systems you may need and NOT in scope
 ## Contact
 
 * Telegram: <https://t.me/philip_is_online>
+* Discuss on Redit: <https://www.reddit.com/r/rust/comments/1nuxveq/i_am_build_a_performance_first_matching_engine/>
