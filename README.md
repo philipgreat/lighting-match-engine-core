@@ -105,6 +105,10 @@ External systems you may need and NOT in scope
 
 * Payment and Wallet System (For Cryptocurrency): Manages deposits, withdrawals, and balances for digital assets, ensuring smooth transactions in cryptocurrency exchanges.
 
+## License
+
+MIT License[LICENSE] ('./LICENSE.md')
+
 ## Contact
 
 * Telegram: <https://t.me/philip_is_online>
