@@ -56,6 +56,24 @@ All the products can be encoded as a number less than 65535, 0 is reseve for onl
 
 * Running two or more instances
 
+## Quick start
+
+Quick Start: Launching the Matching Engine
+The simplest way to start the engine is by specifying the two required parameters: the instance tag (--name) and the product ID (--prodid).
+
+Example Command:
+
+```bash
+./target/release/match_engine --name TFX01 --prodid 505
+```
+
+Explanation:
+
+This command launches an engine instance with the unique identifier TFX01 (the instance tag) dedicated to matching orders for Product 505. All network communication will use the default multicast addresses (224.0.0.1:5000 for trades and 224.0.0.2:5000 for status).
+
+Note: The instance tag (--name) must be 8 characters or less.
+
+
 ## How it works
 
 * Rebuild order book from order book fuel server(order book fuel server is NOT in the project)
