@@ -3,6 +3,11 @@
 A lighting fast matching engine core, focusing on mathing only.
 No assumptions, work with different assets with max 65535 assets
 
+## In scope and NOT in scope
+
+This is not subject to do everyting
+
+
 ## Order types
 
 * Market order
@@ -58,4 +63,3 @@ No assumptions, work with different assets with max 65535 assets
 
 * UDP: getting orders, broading casting engine stats
 * TCP: use for order book rebuilding only
-
