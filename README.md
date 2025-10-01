@@ -1,11 +1,9 @@
 # Lighting Match Engine Core
 
-**RUST IS BORN for MATCHING ENGINES** 
+**RUST IS BORN for MATCHING ENGINES**
 
 A minized lighting fast matching engine core, focusing on mathing only.
 No assumptions, work with different assets with max 65535 assets
-
-
 
 ## Limitations
 
@@ -47,7 +45,6 @@ No assumptions, work with different assets with max 65535 assets
 
 * Running two or more instances
 
-
 ## How it works
 
 * Rebuild order book from order book fuel server(order book fuel server is NOT in the project)
@@ -80,6 +77,10 @@ No assumptions, work with different assets with max 65535 assets
 
 This is not subject to do everyting, the secrets of fast and reliable is KISS(simple and stupid)
 
+What is IN scope
+
+* A SIMPLE, ROBUST system handling large orderbook process need many external tools to work with
+
 External systems you may need and NOT in scope
 
 * Product Management System to define what can be trade to present to end user and control the changes within an organzation and maps asset id as a valid long type, less than 65535
@@ -104,11 +105,6 @@ External systems you may need and NOT in scope
 
 * Payment and Wallet System (For Cryptocurrency): Manages deposits, withdrawals, and balances for digital assets, ensuring smooth transactions in cryptocurrency exchanges.
 
-What is IN scope
-
-* A SIMPLE, ROBUST system handling large orderbook process need many external tools to work with
-
-
 ## Contact
 
-* Telegram: https://t.me/philip_is_online
+* Telegram: <https://t.me/philip_is_online>
