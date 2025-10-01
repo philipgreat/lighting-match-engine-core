@@ -1,12 +1,21 @@
 # Ligting Match Engine Core
 
 A lighting fast matching engine core, focusing on mathing only.
+No assumptions, work with different assets with max 65535 assets
 
-No assumptions, work with different assets
+## Order types
+
+* Market order
+* Limit orders
+
+## Policies
+
+* Prices first
+* Time first
 
 ## Why fast
 
-* Minize depencies only tokio for networking
+* Minimize depencies only tokio for networking
 * Do things that Rust is good at
 * No DB
 * No remote cache
@@ -20,9 +29,13 @@ No assumptions, work with different assets
 
 ## Why reliable
 
-* Running two or more instances
 * Only tokio used as third party crates.
+* Keeping less changes
   
+## Make reliable
+
+* Running two or more instances
+
 
 ## How it works
 
