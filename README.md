@@ -3,11 +3,26 @@
 **RUST IS BORN for MATCHING ENGINES**
 
 A minized lighting fast matching engine core, focusing on mathing only.
-No assumptions, work with different assets with max 65535 assets
+No assumptions, work with different assets with max 65535 products.
+
+Products can be:
+
+* Stock Trading: Like AAPL, TSLA, Meta
+* Cryptocurrency Trading Pairs: BTC-USDT, ETH-USDT, XRP-USDT
+* Futures Contracts: Like S&P 500 futures, Oil futures
+* Options Trading: Like call and put options on stocks or indices
+* Forex Trading: Like USD/EUR, GBP/JPY
+* Commodity Trading: Like Gold, Silver, Crude Oil
+* Derivatives Markets: Like CFDs (Contracts for Difference)
+* NFT Markets: Like NFT auctions and buy/sell orders
+* Peer-to-Peer (P2P) Trading Platforms: Like decentralized exchanges (DEXs) for token swaps
+* Real Estate: Like property listing matching for rental or purchase
+
+All the products can be encoded as a number less than 65535, 0 is reseve for online testing
 
 ## Limitations
 
-* Max 65535 assets
+* Max 65535 products
 * Price from 0 to 2**64
 * Order id from 0 to 2**64
 
@@ -83,7 +98,7 @@ What is IN scope
 
 External systems you may need and NOT in scope
 
-* Product Management System to define what can be trade to present to end user and control the changes within an organzation and maps asset id as a valid long type, less than 65535
+* Product Management System to define what can be trade to present to end user and control the changes within an organzation and maps products id as a valid long type, less than 65535
 
 * Market Data System: Provides real-time and historical market data, ensuring the trading system has accurate price feeds and market insights.
 

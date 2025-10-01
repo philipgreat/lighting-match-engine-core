@@ -21,7 +21,7 @@ pub const MESSAGE_TOTAL_SIZE: usize = 50;
 // 订单结构 (Order) - 用于 MSG_ORDER_SUBMIT
 #[derive(Debug, Clone)] // Clone trait required since we removed Copy
 pub struct Order {
-    pub asset_id: u16,   // 资产编号 (2 bytes)
+    pub product_id: u16,   // 资产编号 (2 bytes)
     pub order_id: u64,   // 订单号 (8 bytes)
     pub price: u64,      // 价格 (8 bytes)
     pub quantity: u32,   // 数量 (4 bytes)
@@ -35,7 +35,7 @@ pub struct Order {
 // 订单撤销结构 (CancelOrder) - 用于 MSG_ORDER_CANCEL
 #[derive(Debug, Clone, Copy)]
 pub struct CancelOrder {
-    pub asset_id: u16,  // 资产编号 (2 bytes)
+    pub product_id: u16,  // 资产编号 (2 bytes)
     pub order_id: u64,  // 要撤销的订单号 (8 bytes)
     // Total Payload Size: 10 bytes
 }
@@ -43,7 +43,7 @@ pub struct CancelOrder {
 // 撮合结果结构 (MatchResult) - 用于 MSG_TRADE_BROADCAST
 #[derive(Debug, Clone, Copy)]
 pub struct MatchResult {
-    pub asset_id: u16,      // 资产编号 (2 bytes)
+    pub product_id: u16,      // 资产编号 (2 bytes)
     pub buy_order_id: u64,  // 买方订单号 (8 bytes)
     pub sell_order_id: u64, // 卖方订单号 (8 bytes)
     pub price: u64,         // 交易价格 (8 bytes)
@@ -54,7 +54,7 @@ pub struct MatchResult {
 // 广播统计结构 (BroadcastStats) - 用于 MSG_STATUS_BROADCAST
 #[derive(Debug, Clone, Copy)]
 pub struct BroadcastStats {
-    pub asset_id: u16,              // 资产编号 (2 bytes)
+    pub product_id: u16,              // 资产编号 (2 bytes)
     pub order_book_size: u64,       // 订单簿大小 (8 bytes)
     pub matched_orders: u64,        // 已成交订单数量 (8 bytes)
     pub total_received_orders: u64, // 总接收订单数量 (8 bytes)
@@ -72,7 +72,7 @@ pub enum IncomingMessage {
 // 订单簿存储在 EngineState 中
 #[derive(Clone)]
 pub struct EngineState {
-    pub asset_id: u16,
+    pub product_id: u16,
     // 订单簿 (Order Book)
     pub order_book: Arc<Mutex<Vec<Order>>>,
     // 计数器 (Counters)

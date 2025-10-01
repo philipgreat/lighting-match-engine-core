@@ -90,10 +90,10 @@ impl OrderMatcher {
         
         let initial_len = book.len();
         
-        // 使用 Vec::retain() 高效地原地移除匹配 asset_id 和 order_id 的订单
+        // 使用 Vec::retain() 高效地原地移除匹配 product_id 和 order_id 的订单
         book.retain(|order| {
-            // 如果 asset_id 和 order_id 都匹配，则返回 false (即移除它)
-            if order.asset_id == cancel.asset_id && order.order_id == cancel.order_id {
+            // 如果 product_id 和 order_id 都匹配，则返回 false (即移除它)
+            if order.product_id == cancel.product_id && order.order_id == cancel.order_id {
                 println!("[MATCHER] Order cancelled successfully: ID {}", order.order_id);
                 false 
             } else {
@@ -104,7 +104,7 @@ impl OrderMatcher {
         let removed_count = initial_len - book.len();
         if removed_count == 0 {
             eprintln!("[MATCHER] Warning: Attempted to cancel non-existent order ID {} for asset {}", 
-                cancel.order_id, cancel.asset_id);
+                cancel.order_id, cancel.product_id);
         }
     }
 
@@ -146,7 +146,7 @@ impl OrderMatcher {
 
         // 1. 寻找最佳匹配订单 (价格优先, 时间优先)
         for (i, existing_order) in book.iter().enumerate() {
-            if new_order.asset_id != existing_order.asset_id {
+            if new_order.product_id != existing_order.product_id {
                 continue;
             }
 
@@ -215,7 +215,7 @@ impl OrderMatcher {
             
             // 返回 MatchResult
             Some(MatchResult {
-                asset_id: new_order.asset_id,
+                product_id: new_order.product_id,
                 buy_order_id,
                 sell_order_id,
                 price: existing_order.price, // 成交价使用 Maker (existing_order) 的价格

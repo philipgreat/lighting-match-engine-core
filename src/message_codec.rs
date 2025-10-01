@@ -21,7 +21,7 @@ pub fn serialize_match_result(result: &MatchResult) -> [u8; MESSAGE_TOTAL_SIZE] 
     let mut offset = 1;
     
     // 2. 消息体 (30 字节)
-    buffer[offset..offset + 2].copy_from_slice(&result.asset_id.to_be_bytes());
+    buffer[offset..offset + 2].copy_from_slice(&result.product_id.to_be_bytes());
     offset += 2;
     buffer[offset..offset + 8].copy_from_slice(&result.buy_order_id.to_be_bytes());
     offset += 8;
@@ -45,7 +45,7 @@ pub fn serialize_stats_result(stats: &BroadcastStats) -> [u8; MESSAGE_TOTAL_SIZE
     let mut offset = 1;
 
     // 2. 消息体 (34 字节)
-    buffer[offset..offset + 2].copy_from_slice(&stats.asset_id.to_be_bytes());
+    buffer[offset..offset + 2].copy_from_slice(&stats.product_id.to_be_bytes());
     offset += 2;
     buffer[offset..offset + 8].copy_from_slice(&stats.order_book_size.to_be_bytes());
     offset += 8;
@@ -87,7 +87,7 @@ pub fn unpack_message_payload(buffer: &[u8; MESSAGE_TOTAL_SIZE]) -> Result<Incom
 fn deserialize_order(payload: &[u8]) -> Order {
     let mut offset = 0;
 
-    let asset_id = u16::from_be_bytes(payload[offset..offset + 2].try_into().unwrap());
+    let product_id = u16::from_be_bytes(payload[offset..offset + 2].try_into().unwrap());
     offset += 2;
     let order_id = u64::from_be_bytes(payload[offset..offset + 8].try_into().unwrap());
     offset += 8;
@@ -105,7 +105,7 @@ fn deserialize_order(payload: &[u8]) -> Order {
     // offset += 8; // Total 40 bytes
 
     Order {
-        asset_id,
+        product_id,
         order_id,
         price,
         quantity,
@@ -119,13 +119,13 @@ fn deserialize_order(payload: &[u8]) -> Order {
 fn deserialize_cancel_order(payload: &[u8]) -> CancelOrder {
     let mut offset = 0;
 
-    let asset_id = u16::from_be_bytes(payload[offset..offset + 2].try_into().unwrap());
+    let product_id = u16::from_be_bytes(payload[offset..offset + 2].try_into().unwrap());
     offset += 2;
     let order_id = u64::from_be_bytes(payload[offset..offset + 8].try_into().unwrap());
     // offset += 8;
 
     CancelOrder {
-        asset_id,
+        product_id,
         order_id,
     }
 }
