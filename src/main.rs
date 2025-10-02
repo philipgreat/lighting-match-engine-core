@@ -10,12 +10,14 @@ mod data_types;
 mod engine_state;
 mod message_codec;
 mod network_handler;
+mod number_tool;
 mod order_matcher;
 mod test_order_book_builder;
 use broadcast_handler::BroadcastHandler;
 use data_types::{EngineState, IncomingMessage, MatchResult};
 use engine_state::StatusBroadcaster;
 use network_handler::NetworkHandler;
+use number_tool::parse_human_readable_u32;
 use order_matcher::OrderMatcher;
 use test_order_book_builder::TestOrderBookBuilder;
 use tokio::net::UdpSocket;
@@ -62,12 +64,13 @@ async fn setup_multicast_socket(
 
 // --- 保持 get_config, tag_to_u8_array 等函数不变 ---
 // --- 保持 get_config, tag_to_u8_array 等函数不变 ---
-fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAddr), String> {
+fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAddr, u32), String> {
     let args: Vec<String> = std::env::args().collect();
     let mut instance_name = None;
     let mut product_id = None;
     let mut trade_addr_str = None;
     let mut status_addr_str = None;
+    let mut test_order_book_size_str = None;
 
     // Command Line Arguments Parsing
     let mut i = 1;
@@ -94,6 +97,12 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
             "--status-addr" => {
                 if i + 1 < args.len() {
                     status_addr_str = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
+            "--test-order-book-size" => {
+                if i + 1 < args.len() {
+                    test_order_book_size_str = Some(args[i + 1].clone());
                     i += 1;
                 }
             }
@@ -140,7 +149,23 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
         .next()
         .ok_or_else(|| "Could not parse status address.".to_string())?;
 
-    Ok((tag_string, prod_id, trade_addr, status_addr))
+    let size_str: &str = test_order_book_size_str
+        .as_deref() // Converts Option<String> to Option<&str>
+        .unwrap_or("0"); // If None, use "0" as the default &str
+
+    let test_order_book_size: u32 = parse_human_readable_u32(size_str).unwrap_or_else(|e| {
+        eprintln!("Error parsing size '{}': {}", size_str, e);
+        // Fallback u32 value if the parsing of the string (even the default "0") fails
+        0
+    });
+
+    Ok((
+        tag_string,
+        prod_id,
+        trade_addr,
+        status_addr,
+        test_order_book_size,
+    ))
 }
 
 fn tag_to_u8_array(tag: &str) -> [u8; 8] {
@@ -156,7 +181,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Lighting Match Engine Core...");
 
     // 1. Get configuration
-    let (tag_string, prod_id, trade_addr, status_addr) = match get_config() {
+    let (tag_string, prod_id, trade_addr, status_addr, test_order_book_size) = match get_config() {
         Ok(config) => config,
         Err(e) => {
             eprintln!("Configuration Error: {}", e);
@@ -210,7 +235,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         status_addr,
     ));
 
-    let mut test_order_book_builder = TestOrderBookBuilder::new(1024 * 10, engine_state.clone());
+    let mut test_order_book_builder =
+        TestOrderBookBuilder::new(test_order_book_size, engine_state.clone());
 
     test_order_book_builder.start_run().await;
 
