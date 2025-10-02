@@ -7,13 +7,13 @@ mod engine_state;
 mod message_codec;
 mod network_handler;
 mod order_matcher;
-
+mod test_order_book_builder;
 use broadcast_handler::BroadcastHandler;
-use data_types::{EngineState, IncomingMessage,MatchResult};
+use data_types::{EngineState, IncomingMessage, MatchResult};
 use engine_state::StatusBroadcaster;
 use network_handler::NetworkHandler;
 use order_matcher::OrderMatcher;
-
+use test_order_book_builder::TestOrderBookBuilder;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
@@ -79,7 +79,10 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
         "Missing required argument: --prodid. Also check env var PROD_ID.".to_string()
     })?;
     let prod_id: u16 = prod_id_str.parse().map_err(|_| {
-        format!("Invalid product ID format: '{}'. Must be a valid u16.", prod_id_str)
+        format!(
+            "Invalid product ID format: '{}'. Must be a valid u16.",
+            prod_id_str
+        )
     })?;
 
     // 3. Multicast Addresses
@@ -118,7 +121,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(config) => config,
         Err(e) => {
             eprintln!("Configuration Error: {}", e);
-            eprintln!("Usage: --name <tag_8_chars_max> --prodid <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]");
+            eprintln!(
+                "Usage: --name <tag_8_chars_max> --prodid <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]"
+            );
             return Err(e.into());
         }
     };
@@ -158,10 +163,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 5. Initialize Handlers
     // FIX for E0596: All handlers must be declared as mutable to call run_*_loop methods.
-    let mut network_handler = NetworkHandler::new(shared_input_socket.clone(), message_tx, engine_state.clone());
+    let mut network_handler = NetworkHandler::new(
+        shared_input_socket.clone(),
+        message_tx,
+        engine_state.clone(),
+    );
     let mut order_matcher = OrderMatcher::new(message_rx, match_tx, engine_state.clone());
-    let mut broadcast_handler = BroadcastHandler::new(shared_broadcast_socket.clone(), engine_state.trade_multicast_addr, match_rx);
-    let status_broadcaster = EngineState::new_status_broadcaster(engine_state.clone(), shared_broadcast_socket.clone());
+    let mut broadcast_handler = BroadcastHandler::new(
+        shared_broadcast_socket.clone(),
+        engine_state.trade_multicast_addr,
+        match_rx,
+    );
+    let status_broadcaster =
+        EngineState::new_status_broadcaster(engine_state.clone(), shared_broadcast_socket.clone());
+
+    let mut test_order_book_builder = TestOrderBookBuilder::new(10 * 1000, engine_state.clone());
+
+    test_order_book_builder.start_run().await;
 
     // 6. Run all tasks concurrently
     // Note: status_broadcaster is a structure implementing an async method, which is run via tokio::spawn
@@ -171,6 +189,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ = broadcast_handler.run_broadcast_loop() => { println!("Broadcast handler exited."); }
         _ = status_broadcaster.run_status_broadcast() => { println!("Status broadcaster exited."); }
     }
+    print!("runs here");
 
     Ok(())
 }
