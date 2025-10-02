@@ -6,6 +6,7 @@ use tokio::time::{self, Duration};
 
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 impl EngineState {
     /// Creates a new EngineState instance with initialized components.
@@ -15,7 +16,10 @@ impl EngineState {
         trade_multicast_addr: SocketAddr,
         status_multicast_addr: SocketAddr,
     ) -> Self {
-        let now_nanos = time::Instant::now().elapsed().as_nanos() as u64;
+        let now_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("fail")
+            .as_nanos() as u64;
 
         EngineState {
             instance_tag,
@@ -48,7 +52,7 @@ impl StatusBroadcaster {
     /// Runs the periodic status broadcast loop.
     pub async fn run_status_broadcast(&self) {
         let mut interval = time::interval(Duration::from_secs(1));
-        
+
         let addr = self.state.status_multicast_addr;
         println!("Status broadcaster started. Target address: {}", addr);
 
@@ -70,7 +74,7 @@ impl StatusBroadcaster {
                 total_received_orders: *total_received_orders,
                 start_time: self.state.start_time,
             };
-
+            println!("trying to send some status info {:?}", stats);
             // 3. Serialize and send
             let buf: [u8; MESSAGE_TOTAL_SIZE] = message_codec::serialize_stats_result(&stats);
             if let Err(e) = self.socket.send_to(&buf, addr).await {
