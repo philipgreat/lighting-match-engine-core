@@ -51,7 +51,7 @@ All the products can be encoded as a number less than 65535, 0 is reseve for onl
 
 * Only tokio used as third party crates.
 * Keeping less changes
-  
+
 ## Make reliable
 
 * Running two or more instances
@@ -64,14 +64,14 @@ The simplest way to start the engine is by specifying the two required parameter
 Example Command:
 
 ```bash
-./target/release/match_engine --name TFX01 --prodid 505
+./target/release/match_engine --tag TFX01 --prodid 505
 ```
 
 Explanation:
 
 This command launches an engine instance with the unique identifier TFX01 (the instance tag) dedicated to matching orders for Product 505. All network communication will use the default multicast addresses (224.0.0.1:5000 for trades and 224.0.0.2:5000 for status).
 
-Note: The instance tag (--name) must be 8 characters or less.
+Note: The instance tag (--tag) must be 8 characters or less.
 
 
 ## How it works
@@ -89,7 +89,7 @@ Note: The instance tag (--name) must be 8 characters or less.
 * engine_stats.rs: holding order and broad casting stats
 * order_matcher.rs: the core logic of matching orders
 * message_codec.rs: encode/decode network messages
-* broadcast_handler.rs: broadcast messages  
+* broadcast_handler.rs: broadcast messages
 
 ## How network used
 

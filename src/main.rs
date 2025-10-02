@@ -1,5 +1,9 @@
-use std::net::ToSocketAddrs;
+use std::io;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs}; // <-- 增加 IpAddr
 use std::sync::Arc;
+// 引入 socket2 进行底层套接字配置
+
+use socket2::{Domain, Protocol, SockRef, Socket, Type};
 
 mod broadcast_handler;
 mod data_types;
@@ -19,9 +23,45 @@ use tokio::sync::mpsc;
 
 const DEFAULT_TRADE_ADDR: &str = "239.0.0.1:5000";
 const DEFAULT_STATUS_ADDR: &str = "239.0.0.2:5001";
-const DEFAULT_BIND_ADDR: &str = "0.0.0.0:0"; // Bind to all interfaces, OS chooses port
+// 监听组播时，绑定地址需要包含端口，但IP通常是0.0.0.0
+// 为了简化，我们只监听 trade_addr 或 status_addr 的端口
+const DEFAULT_LISTEN_IP: &str = "0.0.0.0";
 
-/// Parses configuration from command line arguments or environment variables.
+// --- 新增函数：配置和加入组播组 ---
+
+/// 设置 UDP 套接字并加入指定的组播组。
+///
+/// `listen_port`: 组播地址的端口 (例如 5000)
+/// `multicast_addr`: 组播 IP 地址 (例如 239.0.0.1)
+async fn setup_multicast_socket(
+    listen_port: u16,
+    multicast_addr: Ipv4Addr,
+) -> io::Result<UdpSocket> {
+    let listen_addr = format!("{}:{}", DEFAULT_LISTEN_IP, listen_port);
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+
+    // 重要的配置：允许重复使用地址，用于多个进程监听同一端口
+    socket.set_reuse_address(true)?;
+
+    // This call now works because SocketExt is in scope:
+
+    let bind_addr: SocketAddr = listen_addr.parse().unwrap();
+    socket.bind(&bind_addr.into())?;
+
+    // 加入组播组。
+    socket.join_multicast_v4(&multicast_addr, &Ipv4Addr::UNSPECIFIED)?;
+
+    // 转换为 tokio::net::UdpSocket
+    let std_socket: std::net::UdpSocket = socket.into();
+    std_socket.set_nonblocking(true)?;
+
+    UdpSocket::from_std(std_socket)
+
+    // 绑定到指定的端口和 0.0.0.0 IP
+}
+
+// --- 保持 get_config, tag_to_u8_array 等函数不变 ---
+// --- 保持 get_config, tag_to_u8_array 等函数不变 ---
 fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAddr), String> {
     let args: Vec<String> = std::env::args().collect();
     let mut instance_name = None;
@@ -103,7 +143,6 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
     Ok((tag_string, prod_id, trade_addr, status_addr))
 }
 
-/// Utility function to convert String tag to fixed-size [u8; 8] array.
 fn tag_to_u8_array(tag: &str) -> [u8; 8] {
     let mut tag_array = [0u8; 8];
     let bytes = tag.as_bytes();
@@ -137,15 +176,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Status Multicast: {}", status_addr);
     println!("--------------------------------------------------");
 
-    // 2. Initialize Sockets
-    // NOTE: In a real system, you'd configure the input socket for the specific port/interface it needs to bind to.
-    let input_socket = UdpSocket::bind(DEFAULT_BIND_ADDR).await?;
-    let shared_input_socket = Arc::new(input_socket);
+    // 2. Initialize Sockets and JOIN Multicast Group
 
-    // Broadcast socket needs to be bound to a local address suitable for sending to multicast.
-    let broadcast_socket = UdpSocket::bind(DEFAULT_BIND_ADDR).await?;
+    // --- 修改点 A：为输入套接字（接收 Trade）加入组播组 ---
+    let trade_ip = match trade_addr.ip() {
+        IpAddr::V4(ip) => ip,
+        _ => return Err("Trade multicast must be IPv4".into()),
+    };
+    let input_socket = setup_multicast_socket(trade_addr.port(), trade_ip).await?;
+    let shared_input_socket = Arc::new(input_socket);
+    println!(
+        "✅ Input socket bound to {} and joined trade group: {}",
+        shared_input_socket.local_addr()?,
+        trade_addr
+    );
+
+    // Broadcast socket (发送 Status 和 Trade) 只需要绑定到本地地址
+    // 并且设置 TTL 以确保数据包能被路由。
+    let broadcast_socket = UdpSocket::bind("0.0.0.0:0").await?; // 绑定到任意端口
     broadcast_socket.set_multicast_ttl_v4(64)?;
     let shared_broadcast_socket = Arc::new(broadcast_socket);
+    println!(
+        "✅ Broadcast socket bound to {}",
+        shared_broadcast_socket.local_addr()?
+    );
+    println!("--------------------------------------------------");
 
     // 3. Initialize Engine State
     let engine_state = Arc::new(EngineState::new(
@@ -156,13 +211,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     // 4. Initialize Channels
-    // Channel for incoming messages (Network -> Matcher)
     let (message_tx, message_rx) = mpsc::channel::<IncomingMessage>(1024);
-    // Channel for matched trades (Matcher -> Broadcast)
     let (match_tx, match_rx) = mpsc::channel::<MatchResult>(1024);
 
     // 5. Initialize Handlers
-    // FIX for E0596: All handlers must be declared as mutable to call run_*_loop methods.
     let mut network_handler = NetworkHandler::new(
         shared_input_socket.clone(),
         message_tx,
@@ -177,12 +229,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let status_broadcaster =
         EngineState::new_status_broadcaster(engine_state.clone(), shared_broadcast_socket.clone());
 
-    let mut test_order_book_builder = TestOrderBookBuilder::new(10 * 1000, engine_state.clone());
+    let mut test_order_book_builder = TestOrderBookBuilder::new(1, engine_state.clone());
 
     test_order_book_builder.start_run().await;
 
     // 6. Run all tasks concurrently
-    // Note: status_broadcaster is a structure implementing an async method, which is run via tokio::spawn
     tokio::select! {
         _ = network_handler.run_receive_loop() => { println!("Network receiver exited."); }
         _ = order_matcher.run_matching_loop() => { println!("Order matcher exited."); }
