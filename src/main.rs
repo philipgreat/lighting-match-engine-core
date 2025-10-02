@@ -253,7 +253,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut order_matcher = OrderMatcher::new(message_rx, match_tx, engine_state.clone());
     let mut broadcast_handler = BroadcastHandler::new(
         shared_broadcast_socket.clone(),
-        engine_state.trade_multicast_addr,
+        engine_state.status_multicast_addr,
         match_rx,
     );
     let status_broadcaster =
