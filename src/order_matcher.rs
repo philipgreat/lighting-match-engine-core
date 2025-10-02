@@ -3,10 +3,10 @@ use crate::data_types::{
     ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
 };
 
+use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::mpsc::{Receiver, Sender};
-
 /// Handler responsible for the core order matching logic.
 pub struct OrderMatcher {
     receiver: Receiver<IncomingMessage>,
@@ -51,6 +51,66 @@ impl OrderMatcher {
         now_nanos
     }
 
+    fn find_best_match_index(
+        book: &mut Vec<Order>,
+        new_order: &Order,
+        // 移除了 is_buy: bool, is_limit: bool,
+    ) -> Option<usize> {
+        // ⭐ 优化点 1: 在方法内部推导出布尔值
+        let is_buy = new_order.order_type == ORDER_TYPE_BUY;
+        let is_limit = new_order.price_type == ORDER_PRICE_TYPE_LIMIT;
+
+        // 1. Filter out all potential counter-orders that satisfy the cross-price condition.
+        let potential_matches: Vec<usize> = book
+            .iter()
+            .enumerate()
+            .filter_map(|(i, existing_order)| {
+                let is_opposite_side = existing_order.order_type != new_order.order_type;
+
+                if !is_opposite_side {
+                    return None; // Must be opposite side (Buy vs. Sell)
+                }
+
+                // Check if the price condition is met (i.e., the price crosses)
+                let price_condition_met = (is_buy && existing_order.price <= new_order.price) || // New Buy matches existing Sell <= Buyer's Limit Price
+                                          (!is_buy && existing_order.price >= new_order.price); // New Sell matches existing Buy >= Seller's Limit Price
+
+                // Market orders match any counter-side order regardless of price
+                let market_order_match =
+                    new_order.price_type == ORDER_PRICE_TYPE_MARKET && is_opposite_side;
+
+                if (is_limit && price_condition_met) || market_order_match {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .collect(); // Collect indices of all executable orders
+
+        // 2. Apply "Price Priority then Time Priority" using min_by
+        potential_matches.into_iter().min_by(|&i_a, &i_b| {
+            let order_a = &book[i_a];
+            let order_b = &book[i_b];
+
+            // --- Price Priority ---
+            let price_cmp = if is_buy {
+                // When the new order is a Buy, we look for the cheapest Sell (Lowest Price is Best)
+                order_a.price.cmp(&order_b.price)
+            } else {
+                // When the new order is a Sell, we look for the most expensive Buy (Highest Price is Best)
+                // Reverse the comparison (b vs a) to find the maximum price using min_by.
+                order_b.price.cmp(&order_a.price)
+            };
+
+            if price_cmp != Ordering::Equal {
+                return price_cmp;
+            }
+
+            // --- Time Priority ---
+            // If prices are equal, use Time Priority (Earliest submit_time is Best).
+            order_a.submit_time.cmp(&order_b.submit_time)
+        })
+    }
     /// Handles an incoming order (Limit or Market).
     async fn handle_order_submission(&self, new_order: Order) {
         // Only process orders for the configured product_id
@@ -120,39 +180,13 @@ impl OrderMatcher {
             return;
         }
 
+        let start_time = Self::current_timestamp();
+
         while new_order.quantity > 0 && matches_occurred {
             matches_occurred = false;
             //println!("1======>check new order {:?} is comming", new_order);
             // 1. Find the best potential match index based on price and time
-            let best_match_index = book
-                .iter()
-                .enumerate()
-                .filter_map(|(i, existing_order)| {
-                    let is_opposite_side = existing_order.order_type != new_order.order_type;
-
-                    // println!("::{:?}", new_order);
-                    // println!("::{:?}", existing_order);
-                    // println!("---------------------------------------------");
-
-                    if !is_opposite_side {
-                        return None;
-                    }
-
-                    let price_condition_met = (is_buy && existing_order.price <= new_order.price) || // Buy matches Sell <= LimitPrice
-                    (!is_buy && existing_order.price >= new_order.price) || // Sell matches Buy >= LimitPrice
-                    new_order.price_type == ORDER_PRICE_TYPE_MARKET; // Market orders match any price
-
-                    let market_order_match =
-                        new_order.price_type == ORDER_PRICE_TYPE_MARKET && is_opposite_side;
-
-                    if (is_limit && price_condition_met) || market_order_match {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                })
-                // 2. Apply Time Priority: Find the one with the earliest submit_time
-                .min_by_key(|&i| book[i].submit_time);
+            let best_match_index = Self::find_best_match_index(book, &new_order);
 
             println!("best match index {:?} ", best_match_index);
 
@@ -185,7 +219,8 @@ impl OrderMatcher {
                     },
                     price: trade_price,
                     quantity: trade_qty,
-                    trade_time: Self::current_timestamp() - new_order.submit_time,
+                    trade_time_network: (Self::current_timestamp() - new_order.submit_time) as u32,
+                    internal_match_time: (Self::current_timestamp() - start_time) as u32,
                 };
                 println!("=========>result generated");
                 // 5. Broadcast the match result
