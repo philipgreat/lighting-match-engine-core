@@ -131,10 +131,10 @@ impl OrderMatcher {
 
         // 1. Pre-matching clean-up: Remove expired orders
         self.cleanup_expired_orders(&mut order_book);
-        println!(
-            "==========> after cleanup_expired_orders orders in book: {:?}",
-            order_book.len()
-        );
+        // println!(
+        //     "==========> after cleanup_expired_orders orders in book: {:?}",
+        //     order_book.len()
+        // );
 
         // 2. Execute matching
         self.match_orders(new_order, &mut order_book).await;
