@@ -1,6 +1,6 @@
 use crate::data_types::{
-    BroadcastStats, CancelOrder, MatchResult, Order, MESSAGE_TOTAL_SIZE, MSG_ORDER_CANCEL,
-    MSG_ORDER_SUBMIT, MSG_STATUS_BROADCAST, MSG_TRADE_BROADCAST,
+    BroadcastStats, CancelOrder, MESSAGE_TOTAL_SIZE, MSG_ORDER_CANCEL, MSG_ORDER_SUBMIT,
+    MSG_STATUS_BROADCAST, MSG_TRADE_BROADCAST, MatchResult, Order,
 };
 
 /// Calculates a simple XOR checksum for the payload starting after the type byte (index 2).
@@ -72,13 +72,17 @@ pub fn serialize_match_result(result: &MatchResult) -> [u8; MESSAGE_TOTAL_SIZE] 
     // Buy Order ID (u64)
     buf[payload_start + 10..payload_start + 18].copy_from_slice(&result.buy_order_id.to_be_bytes());
     // Sell Order ID (u64)
-    buf[payload_start + 18..payload_start + 26].copy_from_slice(&result.sell_order_id.to_be_bytes());
+    buf[payload_start + 18..payload_start + 26]
+        .copy_from_slice(&result.sell_order_id.to_be_bytes());
     // Price (u64)
     buf[payload_start + 26..payload_start + 34].copy_from_slice(&result.price.to_be_bytes());
     // Quantity (u32)
     buf[payload_start + 34..payload_start + 38].copy_from_slice(&result.quantity.to_be_bytes());
     // Trade Time (u64)
-    buf[payload_start + 38..payload_start + 46].copy_from_slice(&result.trade_time.to_be_bytes());
+    buf[payload_start + 38..payload_start + 42]
+        .copy_from_slice(&result.trade_time_network.to_be_bytes());
+    buf[payload_start + 42..payload_start + 46]
+        .copy_from_slice(&result.trade_time_network.to_be_bytes());
     // Padding to 50 bytes is implicit by the array size (index 48 is the last element used)
 
     // Checksum calculation and placement
@@ -99,11 +103,14 @@ pub fn serialize_stats_result(stats: &BroadcastStats) -> [u8; MESSAGE_TOTAL_SIZE
     // Product ID (u16)
     buf[payload_start + 8..payload_start + 10].copy_from_slice(&stats.product_id.to_be_bytes());
     // Order Book Size (u64)
-    buf[payload_start + 10..payload_start + 18].copy_from_slice(&stats.order_book_size.to_be_bytes());
+    buf[payload_start + 10..payload_start + 18]
+        .copy_from_slice(&stats.order_book_size.to_be_bytes());
     // Matched Orders (u64)
-    buf[payload_start + 18..payload_start + 26].copy_from_slice(&stats.matched_orders.to_be_bytes());
+    buf[payload_start + 18..payload_start + 26]
+        .copy_from_slice(&stats.matched_orders.to_be_bytes());
     // Total Received Orders (u64)
-    buf[payload_start + 26..payload_start + 34].copy_from_slice(&stats.total_received_orders.to_be_bytes());
+    buf[payload_start + 26..payload_start + 34]
+        .copy_from_slice(&stats.total_received_orders.to_be_bytes());
     // Start Time (u64)
     buf[payload_start + 34..payload_start + 42].copy_from_slice(&stats.start_time.to_be_bytes());
     // Padding to 50 bytes is implicit by the array size (index 44 is the last element used)
@@ -123,7 +130,7 @@ pub fn unpack_message_payload(buf: &[u8; MESSAGE_TOTAL_SIZE]) -> Result<(u8, &[u
 
     let received_checksum = buf[0];
     let calculated_checksum = calculate_checksum(buf);
-    
+
     if received_checksum != calculated_checksum {
         return Err("Checksum failed");
     }
@@ -170,5 +177,8 @@ pub fn deserialize_cancel_order(payload: &[u8]) -> Result<CancelOrder, &'static 
     let product_id = u16::from_be_bytes(payload[0..2].try_into().unwrap());
     let order_id = u64::from_be_bytes(payload[2..10].try_into().unwrap());
 
-    Ok(CancelOrder { product_id, order_id })
+    Ok(CancelOrder {
+        product_id,
+        order_id,
+    })
 }

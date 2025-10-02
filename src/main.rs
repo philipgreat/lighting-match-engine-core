@@ -210,7 +210,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         status_addr,
     ));
 
-    let mut test_order_book_builder = TestOrderBookBuilder::new(1024 * 1024, engine_state.clone());
+    let mut test_order_book_builder = TestOrderBookBuilder::new(1024 * 10, engine_state.clone());
 
     test_order_book_builder.start_run().await;
 
