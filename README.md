@@ -74,8 +74,6 @@ cargo run -- --prodid 7 --tag FIX009 --test-order-book-size 10k
 ```
 Open another terminal
 
-[testool](https://github.com/philipgreat/match-engine-cmd-tool)
-
 ```bash
 git clone https://github.com/philipgreat/match-engine-cmd-tool
 cd match-engine-cmd-tool
