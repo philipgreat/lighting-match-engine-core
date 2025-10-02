@@ -210,6 +210,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         status_addr,
     ));
 
+    let mut test_order_book_builder = TestOrderBookBuilder::new(1024 * 1024, engine_state.clone());
+
+    test_order_book_builder.start_run().await;
+
     // 4. Initialize Channels
     let (message_tx, message_rx) = mpsc::channel::<IncomingMessage>(1024);
     let (match_tx, match_rx) = mpsc::channel::<MatchResult>(1024);
@@ -228,10 +232,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let status_broadcaster =
         EngineState::new_status_broadcaster(engine_state.clone(), shared_broadcast_socket.clone());
-
-    let mut test_order_book_builder = TestOrderBookBuilder::new(1, engine_state.clone());
-
-    test_order_book_builder.start_run().await;
 
     // 6. Run all tasks concurrently
     tokio::select! {

@@ -63,9 +63,18 @@ impl OrderMatcher {
         }
 
         let mut order_book = self.state.order_book.lock().await;
+        if order_book.is_empty() {
+            println!("no orders in book: {:?}", order_book);
+            order_book.push(new_order);
+            return;
+        }
 
         // 1. Pre-matching clean-up: Remove expired orders
         self.cleanup_expired_orders(&mut order_book);
+        println!(
+            "==========> after cleanup_expired_orders orders in book: {:?}",
+            order_book.len()
+        );
 
         // 2. Execute matching
         self.match_orders(new_order, &mut order_book).await;
@@ -74,7 +83,6 @@ impl OrderMatcher {
     /// Removes expired orders from the order book.
     fn cleanup_expired_orders(&self, book: &mut Vec<Order>) {
         let now = Self::current_timestamp();
-
         // Retain only non-expired orders (expire_time == 0 OR expire_time > now)
         book.retain(|order| order.expire_time == 0 || order.expire_time > now);
     }
@@ -104,15 +112,28 @@ impl OrderMatcher {
 
         let mut matches_occurred = true;
 
+        println!("========>order size for matching {:?}", book.len());
+
+        if book.is_empty() {
+            //println!("========> no orders in book: {:?}", book);
+            book.push(new_order);
+            return;
+        }
+
         while new_order.quantity > 0 && matches_occurred {
             matches_occurred = false;
-
+            //println!("1======>check new order {:?} is comming", new_order);
             // 1. Find the best potential match index based on price and time
             let best_match_index = book
                 .iter()
                 .enumerate()
                 .filter_map(|(i, existing_order)| {
                     let is_opposite_side = existing_order.order_type != new_order.order_type;
+
+                    // println!("::{:?}", new_order);
+                    // println!("::{:?}", existing_order);
+                    // println!("---------------------------------------------");
+
                     if !is_opposite_side {
                         return None;
                     }
@@ -133,7 +154,10 @@ impl OrderMatcher {
                 // 2. Apply Time Priority: Find the one with the earliest submit_time
                 .min_by_key(|&i| book[i].submit_time);
 
+            println!("best match index {:?} ", best_match_index);
+
             if let Some(i) = best_match_index {
+                println!("match!!!!");
                 // We found a match!
                 matches_occurred = true;
                 let mut existing_order = book.remove(i);
@@ -163,7 +187,7 @@ impl OrderMatcher {
                     quantity: trade_qty,
                     trade_time: Self::current_timestamp() - new_order.submit_time,
                 };
-                println!("result generated");
+                println!("=========>result generated");
                 // 5. Broadcast the match result
                 if let Err(e) = self.sender.send(match_result).await {
                     eprintln!("Error sending match result: {}", e);
@@ -195,6 +219,7 @@ impl OrderMatcher {
                 "Unfilled Market Order discarded. Qty Left: {}",
                 new_order.quantity
             );
+            println!("order data {:?}", new_order);
         }
     }
 }
