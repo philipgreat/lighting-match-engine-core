@@ -3,10 +3,9 @@ use crate::data_types::{
     ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
 };
 
-use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::time;
-
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 /// Handler responsible for the core order matching logic.
 pub struct OrderMatcher {
@@ -44,7 +43,12 @@ impl OrderMatcher {
 
     /// Utility function to get the current nanosecond timestamp.
     fn current_timestamp() -> u64 {
-        time::Instant::now().elapsed().as_nanos() as u64
+        //time::Instant::now().elapsed().as_nanos() as u64
+        let now_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("fail")
+            .as_nanos() as u64;
+        now_nanos
     }
 
     /// Handles an incoming order (Limit or Market).
@@ -157,9 +161,9 @@ impl OrderMatcher {
                     },
                     price: trade_price,
                     quantity: trade_qty,
-                    trade_time: Self::current_timestamp(),
+                    trade_time: Self::current_timestamp() - new_order.submit_time,
                 };
-
+                println!("result generated");
                 // 5. Broadcast the match result
                 if let Err(e) = self.sender.send(match_result).await {
                     eprintln!("Error sending match result: {}", e);
