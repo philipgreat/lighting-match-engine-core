@@ -32,6 +32,10 @@ All the products can be encoded as a number less than 65535, 0 is reseve for onl
 * Prices first
 * Time first
 
+## Time and package size
+* All time using nano second as the time unit, most hardware support u seconds precison, some hardware support higher precision timing.
+* All package size are 50 bytes
+
 ## Why fast
 
 * Only a single asset per running instance
@@ -51,7 +55,7 @@ All the products can be encoded as a number less than 65535, 0 is reseve for onl
 
 * Only tokio used as third party crates.
 * Keeping less changes
-  
+
 ## Make reliable
 
 * Running two or more instances
@@ -89,7 +93,7 @@ Note: The instance tag (--name) must be 8 characters or less.
 * engine_stats.rs: holding order and broad casting stats
 * order_matcher.rs: the core logic of matching orders
 * message_codec.rs: encode/decode network messages
-* broadcast_handler.rs: broadcast messages  
+* broadcast_handler.rs: broadcast messages
 
 ## How network used
 
