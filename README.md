@@ -63,13 +63,33 @@ All the products can be encoded as a number less than 65535, 0 is reseve for onl
 ## Quick start
 
 Quick Start: Launching the Matching Engine
-The simplest way to start the engine is by specifying the two required parameters: the instance tag (--name) and the product ID (--prodid).
+The simplest way to start the engine is by specifying the two required parameters: the instance tag ( --tag) and the product ID (--prodid).
 
 Example Command:
 
+Run an engine with 10k sell and buy respectively
+
 ```bash
-./target/release/match_engine --tag TFX01 --prodid 505
+cargo run -- --prodid 7 --tag FIX009 --test-order-book-size 10k
 ```
+Open another terminal
+
+[testool](https://github.com/philipgreat/match-engine-cmd-tool)
+
+```bash
+git clone https://github.com/philipgreat/match-engine-cmd-tool
+cd match-engine-cmd-tool
+cargo run -- submit --order-type=sell --product-id=7 --price=1 --quantity=1 --price-type=limit
+
+```
+
+Observe match result, then you can see some result like this:
+
+```
+MatchResult { instance_tag: [68, 69, 70, 65, 85, 76, 84, 0], product_id: 7, buy_order_id: 10240, sell_order_id: 1759430233617658086, price: 10240, quantity: 1, trade_time_network: 438516, internal_match_time: 116686 }
+```
+
+
 
 Explanation:
 
