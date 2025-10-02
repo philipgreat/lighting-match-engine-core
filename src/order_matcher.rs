@@ -172,7 +172,7 @@ impl OrderMatcher {
 
         let mut matches_occurred = true;
 
-        println!("========>order size for matching {:?}", book.len());
+        //println!("========>order size for matching {:?}", book.len());
 
         if book.is_empty() {
             //println!("========> no orders in book: {:?}", book);
@@ -188,10 +188,10 @@ impl OrderMatcher {
             // 1. Find the best potential match index based on price and time
             let best_match_index = Self::find_best_match_index(book, &new_order);
 
-            println!("best match index {:?} ", best_match_index);
+            //println!("best match index {:?} ", best_match_index);
 
             if let Some(i) = best_match_index {
-                println!("match!!!!");
+                //println!("match!!!!");
                 // We found a match!
                 matches_occurred = true;
                 let mut existing_order = book.remove(i);
@@ -222,7 +222,7 @@ impl OrderMatcher {
                     trade_time_network: (Self::current_timestamp() - new_order.submit_time) as u32,
                     internal_match_time: (Self::current_timestamp() - start_time) as u32,
                 };
-                println!("=========>result generated");
+                //println!("=========>result generated");
                 // 5. Broadcast the match result
                 if let Err(e) = self.sender.send(match_result).await {
                     eprintln!("Error sending match result: {}", e);

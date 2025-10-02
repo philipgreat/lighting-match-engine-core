@@ -22,13 +22,17 @@ impl NetworkHandler {
         sender: Sender<IncomingMessage>,
         state: Arc<EngineState>,
     ) -> Self {
-        NetworkHandler { socket, sender, state }
+        NetworkHandler {
+            socket,
+            sender,
+            state,
+        }
     }
 
     /// Runs the main loop to receive and process UDP messages.
     pub async fn run_receive_loop(&mut self) {
         let mut buf = [0u8; MESSAGE_TOTAL_SIZE];
-        println!("Network handler started, listening for messages...");
+        //println!("Network handler started, listening for messages...");
 
         loop {
             match self.socket.recv_from(&mut buf).await {
@@ -40,8 +44,11 @@ impl NetworkHandler {
                         );
                         continue;
                     }
-                    
-                    println!("Received packet from {}. Size: {} bytes. Processing...", sender_addr, len);
+
+                    println!(
+                        "Received packet from {}. Size: {} bytes. Processing...",
+                        sender_addr, len
+                    );
                     self.process_single_message(&buf).await;
                 }
                 Err(e) => {
@@ -69,14 +76,13 @@ impl NetworkHandler {
         let mut total_count = self.state.total_received_orders.lock().await;
         *total_count += 1;
 
-
         let incoming_message = match message_type {
             MSG_ORDER_SUBMIT => match message_codec::deserialize_order(payload) {
                 Ok(order) => {
-                    println!(
-                        "[LOG] New Order: ProdID={}, Side={}, Price={}, Qty={}",
-                        order.product_id, order.order_type, order.price, order.quantity
-                    );
+                    // println!(
+                    //     "[LOG] New Order: ProdID={}, Side={}, Price={}, Qty={}",
+                    //     order.product_id, order.order_type, order.price, order.quantity
+                    // );
                     IncomingMessage::Order(order)
                 }
                 Err(e) => {
