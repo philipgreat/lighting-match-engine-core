@@ -52,7 +52,7 @@ impl TestOrderBookBuilder {
             price: (index + 1) as u64,
             quantity: 1,
             submit_time: time_now,
-            expire_time: time_now + 1000 * 1000 * 1000 * 1000,
+            expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
         }
     }
 
@@ -70,7 +70,7 @@ impl TestOrderBookBuilder {
             price: (size + 1 + index) as u64,
             quantity: 1,
             submit_time: time_now,
-            expire_time: time_now + 1000 * 1000 * 1000 * 1000,
+            expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
         }
     }
 }
