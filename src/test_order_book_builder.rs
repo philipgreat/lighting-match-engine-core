@@ -50,7 +50,7 @@ impl TestOrderBookBuilder {
             order_type: ORDER_TYPE_BUY,
             price_type: ORDER_PRICE_TYPE_LIMIT,
             price: (index + 1) as u64,
-            quantity: 1,
+            quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
         }
@@ -68,7 +68,7 @@ impl TestOrderBookBuilder {
             order_type: ORDER_TYPE_SELL,
             price_type: ORDER_PRICE_TYPE_LIMIT,
             price: (size + 1 + index) as u64,
-            quantity: 1,
+            quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
         }
