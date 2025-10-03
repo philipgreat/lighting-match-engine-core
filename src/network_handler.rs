@@ -73,7 +73,6 @@ impl NetworkHandler {
 
         // Update total received count
         // FIX for E0308: lock().await returns MutexGuard directly, not a Result
-        let mut total_count = self.state.total_received_orders.lock().await;
 
         let incoming_message = match message_type {
             MSG_ORDER_SUBMIT => match message_codec::deserialize_order(payload) {
@@ -82,6 +81,8 @@ impl NetworkHandler {
                     //     "[LOG] New Order: ProdID={}, Side={}, Price={}, Qty={}",
                     //     order.product_id, order.order_type, order.price, order.quantity
                     // );
+                    let mut total_count = self.state.total_received_orders.write().await;
+
                     *total_count += 1;
                     IncomingMessage::Order(order)
                 }
@@ -96,6 +97,7 @@ impl NetworkHandler {
                         "[LOG] Cancel Order: ProdID={}, OrderID={}",
                         cancel.product_id, cancel.order_id
                     );
+                    let mut total_count = self.state.total_received_orders.write().await;
                     *total_count += 1;
                     IncomingMessage::Cancel(cancel)
                 }

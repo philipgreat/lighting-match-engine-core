@@ -51,17 +51,17 @@ impl OrderMatcher {
         now_nanos
     }
 
-    fn find_best_match_index(
-        book: &mut Vec<Order>,
+    async fn find_best_match_index(
+        &self,
         new_order: &Order,
         // 移除了 is_buy: bool, is_limit: bool,
     ) -> Option<usize> {
         // ⭐ 优化点 1: 在方法内部推导出布尔值
         let is_buy = new_order.order_type == ORDER_TYPE_BUY;
         let is_limit = new_order.price_type == ORDER_PRICE_TYPE_LIMIT;
-
+        let order_book = self.state.get_order_book_to_read().await;
         // 1. Filter out all potential counter-orders that satisfy the cross-price condition.
-        let potential_matches: Vec<usize> = book
+        let potential_matches: Vec<usize> = order_book
             .iter()
             .enumerate()
             .filter_map(|(i, existing_order)| {
@@ -89,8 +89,8 @@ impl OrderMatcher {
 
         // 2. Apply "Price Priority then Time Priority" using min_by
         potential_matches.into_iter().min_by(|&i_a, &i_b| {
-            let order_a = &book[i_a];
-            let order_b = &book[i_b];
+            let order_a = &order_book.get_value(i_a).expect("not able to find order");
+            let order_b = &order_book.get_value(i_b).expect("not able to find order");
 
             // --- Price Priority ---
             let price_cmp = if is_buy {
@@ -122,7 +122,7 @@ impl OrderMatcher {
             return;
         }
 
-        let mut order_book = self.state.order_book.lock().await;
+        let mut order_book = self.state.order_book.write().await;
         if order_book.is_empty() {
             println!("no orders in book: {:?}", order_book);
             order_book.push(new_order);
@@ -130,57 +130,37 @@ impl OrderMatcher {
         }
 
         // 1. Pre-matching clean-up: Remove expired orders
-        self.cleanup_expired_orders(new_order.clone(), &mut order_book);
+        //self.cleanup_expired_orders(new_order.clone(), &mut order_book);
         // println!(
         //     "==========> --tag in book: {:?}",
         //     order_book.len()
         // );
 
         // 2. Execute matching
-        self.match_orders(new_order, &mut order_book).await;
+        self.match_orders(new_order).await;
     }
 
     /// Removes expired orders and the order with same id from the order book.
-    fn cleanup_expired_orders(&self, new_order: Order, book: &mut Vec<Order>) {
-        let now = Self::current_timestamp();
-        // Retain only non-expired orders (expire_time == 0 OR expire_time > now)
-        book.retain(|order| {
-            order.expire_time == 0
-                || order.expire_time > now
-                || new_order.order_id != order.order_id
-        });
-    }
 
     /// Handles order cancellation by removing the matching order from the book.
     async fn handle_order_cancellation(&self, order_id_to_cancel: u64) {
-        let mut order_book = self.state.order_book.lock().await;
+        let mut order_book = self.state.get_order_book_to_write().await;
 
-        if let Some(index) = order_book
-            .iter()
-            .position(|o| o.order_id == order_id_to_cancel)
-        {
-            order_book.remove(index);
-            println!("Order Cancelled: OrderID={}", order_id_to_cancel);
-        } else {
-            println!(
-                "Cancellation failed: OrderID={} not found.",
-                order_id_to_cancel
-            );
-        }
+        order_book.cancel_order(order_id_to_cancel);
     }
 
     /// Core matching logic (Price/Time Priority).
-    async fn match_orders(&self, mut new_order: Order, book: &mut Vec<Order>) {
+    async fn match_orders(&self, mut new_order: Order) {
         let is_limit = new_order.price_type == ORDER_PRICE_TYPE_LIMIT;
         let is_buy = new_order.order_type == ORDER_TYPE_BUY;
 
         let mut matches_occurred = true;
 
         //println!("========>order size for matching {:?}", book.len());
-
-        if book.is_empty() {
+        let mut order_book = self.state.get_order_book_to_write().await;
+        if order_book.is_empty() {
             //println!("========> no orders in book: {:?}", book);
-            book.push(new_order);
+            order_book.push(new_order);
             return;
         }
 
@@ -190,7 +170,7 @@ impl OrderMatcher {
             matches_occurred = false;
             //println!("1======>check new order {:?} is comming", new_order);
             // 1. Find the best potential match index based on price and time
-            let best_match_index = Self::find_best_match_index(book, &new_order);
+            let best_match_index = self.find_best_match_index(&new_order).await;
 
             //println!("best match index {:?} ", best_match_index);
 
@@ -198,7 +178,7 @@ impl OrderMatcher {
                 //println!("match!!!!");
                 // We found a match!
                 matches_occurred = true;
-                let mut existing_order = book.remove(i);
+                let mut existing_order = order_book.remove(i);
 
                 let trade_qty = std::cmp::min(new_order.quantity, existing_order.quantity);
                 let trade_price = existing_order.price; // Maker (existing) price is always the trade price
@@ -233,7 +213,7 @@ impl OrderMatcher {
                 }
 
                 // 6. Update matched orders counter
-                let mut matched_count = self.state.matched_orders.lock().await;
+                let mut matched_count = self.state.matched_orders.write().await;
                 *matched_count += 1;
 
                 // 7. If the existing order has remaining quantity, push it back
@@ -241,17 +221,17 @@ impl OrderMatcher {
                     // Note: Order is Copyable, so we clone to push back, retaining the original
                     // instance for further potential match result reporting if needed (though not strictly necessary here, it's safer).
                     // Since Order does not implement Copy, we must use clone()
-                    book.push(existing_order.clone());
+                    order_book.push(existing_order.clone());
                 }
             }
         }
 
         // 8. If the new order is a Limit Order and has remaining quantity, add it to the book
         if new_order.quantity > 0 && is_limit {
-            book.push(new_order);
+            order_book.push(new_order);
             println!(
                 "Added partial or full Limit Order to book. Qty Left: {}",
-                book.last().unwrap().quantity
+                order_book.last().unwrap().quantity
             );
         } else if new_order.quantity > 0 && new_order.price_type == ORDER_PRICE_TYPE_MARKET {
             println!(

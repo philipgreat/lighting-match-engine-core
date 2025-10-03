@@ -7,10 +7,12 @@ use socket2::{Domain, Protocol, SockRef, Socket, Type};
 
 mod broadcast_handler;
 mod data_types;
+mod date_time_tool;
 mod engine_state;
 mod message_codec;
 mod network_handler;
 mod number_tool;
+mod order_book;
 mod order_matcher;
 mod test_order_book_builder;
 use broadcast_handler::BroadcastHandler;
@@ -216,8 +218,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         trade_addr
     );
 
-    // Broadcast socket (发送 Status 和 Trade) 只需要绑定到本地地址
-    // 并且设置 TTL 以确保数据包能被路由。
     let broadcast_socket = UdpSocket::bind("0.0.0.0:0").await?; // 绑定到任意端口
     broadcast_socket.set_multicast_ttl_v4(64)?;
     let shared_broadcast_socket = Arc::new(broadcast_socket);
@@ -228,12 +228,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("--------------------------------------------------");
 
     // 3. Initialize Engine State
-    let engine_state = Arc::new(EngineState::new(
-        instance_tag_bytes,
-        prod_id,
-        trade_addr,
-        status_addr,
-    ));
+    let engine_state = Arc::new(EngineState::new(instance_tag_bytes, prod_id, status_addr));
 
     let mut test_order_book_builder =
         TestOrderBookBuilder::new(test_order_book_size, engine_state.clone());

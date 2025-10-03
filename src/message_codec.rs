@@ -94,28 +94,48 @@ pub fn serialize_match_result(result: &MatchResult) -> [u8; MESSAGE_TOTAL_SIZE] 
 /// Serializes a BroadcastStats struct into a 50-byte network buffer.
 pub fn serialize_stats_result(stats: &BroadcastStats) -> [u8; MESSAGE_TOTAL_SIZE] {
     let mut buf = [0u8; MESSAGE_TOTAL_SIZE];
-    let payload_start = 2;
 
+    // Payload starts after Checksum (1 byte) and Message Type (1 byte)
+    let payload_start_idx = 2;
+    let mut current_idx = payload_start_idx;
+
+    // Assuming MSG_STATUS_BROADCAST and calculate_checksum are defined elsewhere
     buf[1] = MSG_STATUS_BROADCAST;
 
-    // Instance Tag ([u8; 8])
-    buf[payload_start..payload_start + 8].copy_from_slice(&stats.instance_tag);
-    // Product ID (u16)
-    buf[payload_start + 8..payload_start + 10].copy_from_slice(&stats.product_id.to_be_bytes());
-    // Order Book Size (u64)
-    buf[payload_start + 10..payload_start + 18]
-        .copy_from_slice(&stats.order_book_size.to_be_bytes());
-    // Matched Orders (u64)
-    buf[payload_start + 18..payload_start + 26]
-        .copy_from_slice(&stats.matched_orders.to_be_bytes());
-    // Total Received Orders (u64)
-    buf[payload_start + 26..payload_start + 34]
-        .copy_from_slice(&stats.total_received_orders.to_be_bytes());
-    // Start Time (u64)
-    buf[payload_start + 34..payload_start + 42].copy_from_slice(&stats.start_time.to_be_bytes());
-    // Padding to 50 bytes is implicit by the array size (index 44 is the last element used)
+    // --- Payload Serialization (Total 30 bytes) ---
+
+    // 1. Instance Tag ([u8; 8])
+    // Size: 8 bytes
+    buf[current_idx..current_idx + 8].copy_from_slice(&stats.instance_tag);
+    current_idx += 8; // Index: 10
+
+    // 2. Product ID (u16)
+    // Size: 2 bytes
+    buf[current_idx..current_idx + 2].copy_from_slice(&stats.product_id.to_be_bytes());
+    current_idx += 2; // Index: 12
+
+    // 3. Order Book Size (u32)
+    // Size: 4 bytes (FIXED from u64)
+    buf[current_idx..current_idx + 4].copy_from_slice(&stats.order_book_size.to_be_bytes());
+    current_idx += 4; // Index: 16
+
+    // 4. Matched Orders (u32)
+    // Size: 4 bytes (FIXED from u64)
+    buf[current_idx..current_idx + 4].copy_from_slice(&stats.matched_orders.to_be_bytes());
+    current_idx += 4; // Index: 20
+
+    // 5. Total Received Orders (u32)
+    // Size: 4 bytes (FIXED from u64)
+    buf[current_idx..current_idx + 4].copy_from_slice(&stats.total_received_orders.to_be_bytes());
+    current_idx += 4; // Index: 24
+
+    // 6. Start Time (u64)
+    // Size: 8 bytes
+    buf[current_idx..current_idx + 8].copy_from_slice(&stats.start_time.to_be_bytes());
+    current_idx += 8; // Index: 32 (Last index written: 31)
 
     // Checksum calculation and placement
+    // Last data byte is at index 31. Padding goes from index 32 up to MESSAGE_TOTAL_SIZE - 1.
     buf[0] = calculate_checksum(&buf);
 
     buf

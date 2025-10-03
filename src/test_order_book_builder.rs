@@ -28,7 +28,7 @@ impl TestOrderBookBuilder {
 
     /// Runs the main loop to receive and process UDP messages.
     pub async fn start_run(&mut self) {
-        let mut order_book = self.state.order_book.lock().await;
+        let mut order_book = self.state.order_book.write().await;
         for i in 0..self.test_order_book_size {
             let order = self.create_buy_order(i);
             order_book.push(order);
