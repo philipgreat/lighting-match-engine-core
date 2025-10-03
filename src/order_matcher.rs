@@ -130,7 +130,7 @@ impl OrderMatcher {
         }
 
         // 1. Pre-matching clean-up: Remove expired orders
-        self.cleanup_expired_orders(&mut order_book);
+        self.cleanup_expired_orders(new_order.clone(), &mut order_book);
         // println!(
         //     "==========> --tag in book: {:?}",
         //     order_book.len()
@@ -140,11 +140,15 @@ impl OrderMatcher {
         self.match_orders(new_order, &mut order_book).await;
     }
 
-    /// Removes expired orders from the order book.
-    fn cleanup_expired_orders(&self, book: &mut Vec<Order>) {
+    /// Removes expired orders and the order with same id from the order book.
+    fn cleanup_expired_orders(&self, new_order: Order, book: &mut Vec<Order>) {
         let now = Self::current_timestamp();
         // Retain only non-expired orders (expire_time == 0 OR expire_time > now)
-        book.retain(|order| order.expire_time == 0 || order.expire_time > now);
+        book.retain(|order| {
+            order.expire_time == 0
+                || order.expire_time > now
+                || new_order.order_id != order.order_id
+        });
     }
 
     /// Handles order cancellation by removing the matching order from the book.
