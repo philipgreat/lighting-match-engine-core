@@ -183,4 +183,3 @@ External systems you may need and NOT in scope
 ## Contact
 
 * Telegram: <https://t.me/philip_is_online>
-* Discuss on Redit: <https://www.reddit.com/r/rust/comments/1nuxveq/i_am_build_a_performance_first_matching_engine/>
