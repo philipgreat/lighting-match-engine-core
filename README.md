@@ -85,13 +85,12 @@ Observe match result, then you can see some result like this:
 
 ```
 MatchResult {
-instance_tag: [68, 69, 70, 65, 85, 76, 84, 0],
-product_id: 7,
-buy_order_id: 9989,
-sell_order_id: 1759450561396197151,
-price: 9989, quantity: 1,
-trade_time_network: 164038,
-internal_match_time: 65355 }
+  instance_tag: [68, 69, 70, 65, 85, 76, 84, 0],
+  product_id: 7, buy_order_id: 9673, sell_order_id: 1759453532072894008,
+  price: 9673, quantity: 1,
+  trade_time_network: 99351,
+  internal_match_time: 52125
+}
 ```
 
 The result is generated from a server with CPU running Ubuntu
