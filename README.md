@@ -84,7 +84,14 @@ cargo run -- submit --order-type=sell --product-id=7 --price=1 --quantity=1 --pr
 Observe match result, then you can see some result like this:
 
 ```
-MatchResult { instance_tag: [68, 69, 70, 65, 85, 76, 84, 0], product_id: 7, buy_order_id: 9989, sell_order_id: 1759450561396197151, price: 9989, quantity: 1, trade_time_network: 164038, internal_match_time: 65355 }
+MatchResult {
+instance_tag: [68, 69, 70, 65, 85, 76, 84, 0],
+product_id: 7,
+buy_order_id: 9989,
+sell_order_id: 1759450561396197151,
+price: 9989, quantity: 1,
+trade_time_network: 164038,
+internal_match_time: 65355 }
 ```
 
 The internal match time is 65355 **nano** seconds and the total time from submitting an order by UDP is 164us.
