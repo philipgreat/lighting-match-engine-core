@@ -94,6 +94,15 @@ trade_time_network: 164038,
 internal_match_time: 65355 }
 ```
 
+The result is generated from a server with CPU running Ubuntu
+
+```
+vendor_id	: GenuineIntel
+cpu family	: 6
+model		: 167
+model name	: Intel(R) Xeon(R) E-2314 CPU @ 2.80GHz
+```
+
 The internal match time is 65355 **nano** seconds and the total time from submitting an order by UDP is 164us.
 
 
