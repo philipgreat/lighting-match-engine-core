@@ -102,7 +102,7 @@ model		: 167
 model name	: Intel(R) Xeon(R) E-2314 CPU @ 2.80GHz
 ```
 
-The internal match time is 65355 **nano** seconds and the total time from submitting an order by UDP is 164us.
+The internal match time is 52125 **nano** seconds and the total time from submitting an order by UDP is 99us.
 
 
 Explanation:
