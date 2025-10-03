@@ -3,7 +3,7 @@
 **RUST IS BORN for MATCHING ENGINES**
 
 A minized lighting fast matching engine core, focusing on mathing only.
-No assumptions, work with different products with max 65535.
+No assumptions, an instance serves one product only.
 
 Products can be:
 
