@@ -91,7 +91,7 @@ impl OrderMatcher {
 impl ResultSender for OrderMatcher {
     /// Implements the required method to send a MatchResult.
     async fn send_result(&self, result: MatchResult) {
-        //self.sender.send(result).await;
-        println!("result to send: {:?}", result)
+        self.sender.send(result).await.expect("send error");
+        // println!("result to send: {:?}", result)
     }
 }
