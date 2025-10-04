@@ -1,9 +1,8 @@
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs}; // <-- 增加 IpAddr
 use std::sync::Arc;
-// 引入 socket2 进行底层套接字配置
 
-use socket2::{Domain, Protocol, SockRef, Socket, Type};
+use socket2::{Domain, Protocol, Socket, Type};
 
 mod broadcast_handler;
 mod data_types;
@@ -17,7 +16,7 @@ mod order_matcher;
 mod test_order_book_builder;
 use broadcast_handler::BroadcastHandler;
 use data_types::{EngineState, IncomingMessage, MatchResult};
-use engine_state::StatusBroadcaster;
+
 use network_handler::NetworkHandler;
 use number_tool::parse_human_readable_u32;
 use order_matcher::OrderMatcher;

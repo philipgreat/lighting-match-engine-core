@@ -42,16 +42,6 @@ impl OrderMatcher {
         }
     }
 
-    /// Utility function to get the current nanosecond timestamp.
-    fn current_timestamp() -> u64 {
-        //time::Instant::now().elapsed().as_nanos() as u64
-        let now_nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("fail")
-            .as_nanos() as u64;
-        now_nanos
-    }
-
     /// Handles an incoming order (Limit or Market).
     async fn handle_order_submission(&self, new_order: Order) {
         // Only process orders for the configured product_id
@@ -92,6 +82,8 @@ impl ResultSender for OrderMatcher {
     /// Implements the required method to send a MatchResult.
     async fn send_result(&self, result: MatchResult) {
         self.sender.send(result).await.expect("send error");
-        // println!("result to send: {:?}", result)
+        self.state.increase_match().await;
+
+        //println!("result to send: {:?}", result)
     }
 }

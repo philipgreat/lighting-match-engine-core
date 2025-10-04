@@ -34,6 +34,11 @@ impl EngineState {
     ) -> StatusBroadcaster {
         StatusBroadcaster { state, socket }
     }
+
+    pub async fn increase_match(&self) {
+        let mut match_count = self.matched_orders.write().await;
+        *match_count += 1;
+    }
 }
 
 /// Handler responsible for periodically broadcasting the engine's current state/stats.
