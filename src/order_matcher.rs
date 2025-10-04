@@ -55,7 +55,7 @@ impl OrderMatcher {
     /// Handles an incoming order (Limit or Market).
     async fn handle_order_submission(&self, new_order: Order) {
         // Only process orders for the configured product_id
-        println!("get a new order {:?}", new_order);
+        //println!("get a new order {:?}", new_order);
         if new_order.product_id != self.state.product_id {
             eprintln!(
                 "Order rejected: Mismatched Product ID (Engine: {}, Order: {})",

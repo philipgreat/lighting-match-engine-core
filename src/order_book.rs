@@ -1,5 +1,5 @@
+use crate::date_time_tool::current_timestamp;
 use tokio::sync::RwLock;
-
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
@@ -79,39 +79,76 @@ impl OrderBook {
     // --- Phase 2: Index Preparation ---
 
     /// Finds and stores the indices of the best bid orders. (async)
-    async fn prepare_bids_index(&self) {
-        // Acquire read lock for bids
-        let bids_guard = self.bids.read().await;
-        // Acquire write lock for top_bids_index
-        let mut top_bids_index_guard = self.top_bids_index.write().await;
+    // --- Phase 2: Index Preparation ---
 
+    /// Finds and stores the indices of the best bid orders based on Price (desc) then Time (asc). (async)
+    async fn prepare_bids_index(&self) {
+        // 1. Acquire read lock for bids
+        let bids_guard = self.bids.read().await;
+
+        // 2. Create a list of (index, price, submit_time) for sorting
+        let mut indexed_bids: Vec<(OrderIndex, u64, u64)> = bids_guard
+            .iter()
+            .enumerate()
+            // Map the order to its index, price, and submission time
+            .map(|(i, order)| (i as OrderIndex, order.price, order.submit_time))
+            .collect();
+
+        // 3. Sort the list: Price DESC (b.1.cmp(a.1)) then Time ASC (a.2.cmp(b.2))
+        // Bids: Higher price is better, then older time is better.
+        indexed_bids.sort_by(|a, b| {
+            // Compare Price (Descending)
+            b.1.cmp(&a.1)
+                // If prices are equal, compare Time (Ascending)
+                .then_with(|| a.2.cmp(&b.2))
+        });
+
+        // 4. Acquire write lock for top_bids_index
+        let mut top_bids_index_guard = self.top_bids_index.write().await;
         top_bids_index_guard.clear();
 
-        // MOCK LOGIC: Assumes 'bids' is already sorted by Price (desc) then Time (asc).
+        // 5. Take the first N indices (top orders)
         let max_size = self.init_top_index_size as usize;
-        let num_orders = bids_guard.len().min(max_size);
-
-        for i in 0..num_orders {
-            top_bids_index_guard.push(i as OrderIndex);
+        for (index, _, _) in indexed_bids.into_iter().take(max_size) {
+            top_bids_index_guard.push(index);
         }
+
+        // Lock guards are dropped here automatically.
     }
 
-    /// Finds and stores the indices of the best ask orders. (async)
+    /// Finds and stores the indices of the best ask orders based on Price (asc) then Time (asc). (async)
     async fn prepare_asks_index(&self) {
-        // Acquire read lock for asks
+        // 1. Acquire read lock for asks
         let asks_guard = self.asks.read().await;
-        // Acquire write lock for top_asks_index
-        let mut top_asks_index_guard = self.top_asks_index.write().await;
 
+        // 2. Create a list of (index, price, submit_time) for sorting
+        let mut indexed_asks: Vec<(OrderIndex, u64, u64)> = asks_guard
+            .iter()
+            .enumerate()
+            // Map the order to its index, price, and submission time
+            .map(|(i, order)| (i as OrderIndex, order.price, order.submit_time))
+            .collect();
+
+        // 3. Sort the list: Price ASC (a.1.cmp(b.1)) then Time ASC (a.2.cmp(b.2))
+        // Asks: Lower price is better, then older time is better.
+        indexed_asks.sort_by(|a, b| {
+            // Compare Price (Ascending)
+            a.1.cmp(&b.1)
+                // If prices are equal, compare Time (Ascending)
+                .then_with(|| a.2.cmp(&b.2))
+        });
+
+        // 4. Acquire write lock for top_asks_index
+        let mut top_asks_index_guard = self.top_asks_index.write().await;
         top_asks_index_guard.clear();
 
-        // MOCK LOGIC: Assumes 'asks' is already sorted by Price (asc) then Time (asc).
+        // 5. Take the first N indices (top orders)
         let max_size = self.init_top_index_size as usize;
-        let num_orders = asks_guard.len().min(max_size);
-
-        for i in 0..num_orders {
-            top_asks_index_guard.push(i as OrderIndex);
+        for (index, _, _) in indexed_asks.into_iter().take(max_size) {
+            top_asks_index_guard.push(index);
         }
+
+        // Lock guards are dropped here automatically.
     }
 
     /// Calls both index preparation methods. (async)
@@ -129,6 +166,9 @@ impl OrderBook {
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
+
+        let start_time = current_timestamp();
+
         println!(
             "get a new order {:?} and bids size {:?} asks size: {:?}",
             new_order.clone(),
@@ -142,6 +182,7 @@ impl OrderBook {
                     &mut new_order,
                     false, // match against BUY side
                     sender,
+                    start_time,
                 )
                 .await,
             );
@@ -152,6 +193,7 @@ impl OrderBook {
                     &mut new_order,
                     true, // match against SELL side
                     sender,
+                    start_time,
                 )
                 .await,
             );
@@ -173,6 +215,7 @@ impl OrderBook {
         new_order: &mut Order,
         match_against_asks: bool,
         sender: &T,
+        start_time: u64,
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
 
@@ -267,7 +310,7 @@ impl OrderBook {
             } else {
                 (resting_order.order_id, new_order.order_id)
             };
-
+            let end_time = current_timestamp();
             let match_result = MatchResult {
                 // ... (fields populated) ...
                 instance_tag: [0; 8],
@@ -276,8 +319,8 @@ impl OrderBook {
                 sell_order_id: sell_id,
                 price: trade_price,
                 quantity: trade_quantity,
-                trade_time_network: 0,
-                internal_match_time: 0,
+                trade_time_network: (end_time - new_order.submit_time) as u32,
+                internal_match_time: (end_time - start_time) as u32,
             };
 
             sender.send_result(match_result).await;

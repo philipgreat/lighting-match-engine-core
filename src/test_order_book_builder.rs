@@ -33,7 +33,7 @@ impl TestOrderBookBuilder {
             let order = self.create_sell_order(i, self.test_order_book_size);
             order_book.fuel_order(order).await;
         }
-        order_book.post_match(Vec::with_capacity(0)).await;
+        order_book.prepare_index().await;
     }
     pub fn create_buy_order(&self, index: u32) -> Order {
         //let time_now = time::Instant::now().elapsed().as_nanos() as u64;
