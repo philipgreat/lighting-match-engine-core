@@ -38,7 +38,7 @@ impl trade_network_time {
             // Serialize the MatchResult into the fixed 50-byte buffer
             //
             let buf: [u8; MESSAGE_TOTAL_SIZE] = message_codec::serialize_match_result(&result);
-            // println!("==========>result info {:?}", result);
+            println!("==========>result info {:?}", result);
             // Send the binary data to the dedicated trade multicast address
             if let Err(e) = self.socket.send_to(&buf, self.trade_multicast_addr).await {
                 eprintln!("Error sending trade broadcast: {}", e);
