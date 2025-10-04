@@ -280,7 +280,7 @@ impl OrderBook {
                 internal_match_time: 0,
             };
 
-            sender.send_result(match_result);
+            sender.send_result(match_result).await;
 
             // Remove the index of the matched resting order from the top list
             // NOTE: Must drop read guards before acquiring the write guard for the index list
