@@ -8,14 +8,7 @@
 
 The Lighting Match Engine Core is a minimal, lighting-fast matching engine designed for a single purpose: **matching orders with extreme speed and reliability**.
 
-<<<<<<< HEAD
 It's a focused, no-frills engine that you can build upon. Each instance serves a single product, making it highly efficient and scalable.
-=======
-## What is this
-
-A minized lighting fast matching engine core, focusing on mathing only.
-No assumptions, one instance serves one product only.
->>>>>>> 7afcae3 (🚀add doc)
 
 ## 🚀 Why Choose Lighting Match Engine Core?
 
@@ -38,13 +31,9 @@ No assumptions, one instance serves one product only.
 *   **In-Memory Processing:** All operations happen in memory for maximum speed.
 *   **UDP Multicast:** Orders are received via UDP multicast for low-latency communication.
 
-<<<<<<< HEAD
 ## 🛠️ Quick Start
 
 Get up and running in minutes!
-=======
-## Order types
->>>>>>> 7afcae3 (🚀add doc)
 
 1.  **Start the Engine:**
 
@@ -66,19 +55,11 @@ Get up and running in minutes!
 
 3.  **See the Magic:**
 
-    You'll see a match result like this:
+  You'll see a match result like this:
 
-    ```
-    MatchResult {
-      instance_tag: [68, 69, 70, 65, 85, 76, 84, 0],
-      product_id: 7, buy_order_id: 9673, sell_order_id: 1759453532072894008,
-      price: 9673, quantity: 1,
-      trade_time_network: 99351,
-      internal_match_time: 52125
-    }
-    ```
+![test screen shot ](docs/test-screen-shot.png)
 
-    That's an internal match time of just **52,125 nanoseconds**!
+  That's an internal match time of just **3346 nanoseconds** with 1M asks and bids respectively!
 
 ## ⚙️ How It Works
 
