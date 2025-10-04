@@ -8,7 +8,14 @@
 
 The Lighting Match Engine Core is a minimal, lighting-fast matching engine designed for a single purpose: **matching orders with extreme speed and reliability**.
 
+<<<<<<< HEAD
 It's a focused, no-frills engine that you can build upon. Each instance serves a single product, making it highly efficient and scalable.
+=======
+## What is this
+
+A minized lighting fast matching engine core, focusing on mathing only.
+No assumptions, one instance serves one product only.
+>>>>>>> 7afcae3 (🚀add doc)
 
 ## 🚀 Why Choose Lighting Match Engine Core?
 
@@ -31,9 +38,13 @@ It's a focused, no-frills engine that you can build upon. Each instance serves a
 *   **In-Memory Processing:** All operations happen in memory for maximum speed.
 *   **UDP Multicast:** Orders are received via UDP multicast for low-latency communication.
 
+<<<<<<< HEAD
 ## 🛠️ Quick Start
 
 Get up and running in minutes!
+=======
+## Order types
+>>>>>>> 7afcae3 (🚀add doc)
 
 1.  **Start the Engine:**
 
