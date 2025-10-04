@@ -67,7 +67,7 @@ All the products can be encoded as a number less than 65535, 0 is reseve for onl
 * No computing with strings, floats, only integeral types
 * Purely in memory except rebuild the order book
 * Recieving orders by UDP multicast
-* Keep code lines less than 2000 （now it is 500）
+* Keep code lines less than 2000 （now it is 1500）
 * 50 bytes per package
 
 ## Why reliable
