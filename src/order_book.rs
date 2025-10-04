@@ -204,7 +204,7 @@ impl OrderBook {
             self.fuel_order(new_order).await;
         }
 
-        println!("get a new matched_orders {:?}", matched_orders.clone());
+        //println!("get a new matched_orders {:?}", matched_orders.clone());
         matched_orders
     }
 
