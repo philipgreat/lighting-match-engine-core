@@ -82,7 +82,7 @@ pub fn serialize_match_result(result: &MatchResult) -> [u8; MESSAGE_TOTAL_SIZE] 
     buf[payload_start + 38..payload_start + 42]
         .copy_from_slice(&result.trade_time_network.to_be_bytes());
     buf[payload_start + 42..payload_start + 46]
-        .copy_from_slice(&result.trade_time_network.to_be_bytes());
+        .copy_from_slice(&result.internal_match_time.to_be_bytes());
     // Padding to 50 bytes is implicit by the array size (index 48 is the last element used)
 
     // Checksum calculation and placement
