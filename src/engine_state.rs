@@ -69,7 +69,7 @@ impl StatusBroadcaster {
                 total_received_orders: *total_received_orders as u32,
                 start_time: self.state.start_time,
             };
-            println!("status info {:?}", stats);
+            //println!("status info {:?}", stats);
 
             // 3. Serialize and send
             let buf: [u8; MESSAGE_TOTAL_SIZE] = message_codec::serialize_stats_result(&stats);

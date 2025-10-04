@@ -55,6 +55,7 @@ impl OrderMatcher {
     /// Handles an incoming order (Limit or Market).
     async fn handle_order_submission(&self, new_order: Order) {
         // Only process orders for the configured product_id
+        println!("get a new order {:?}", new_order);
         if new_order.product_id != self.state.product_id {
             eprintln!(
                 "Order rejected: Mismatched Product ID (Engine: {}, Order: {})",
@@ -89,7 +90,8 @@ impl OrderMatcher {
 }
 impl ResultSender for OrderMatcher {
     /// Implements the required method to send a MatchResult.
-    fn send_result(&self, result: MatchResult) {
+    async fn send_result(&self, result: MatchResult) {
+        //self.sender.send(result).await;
         println!("result to send: {:?}", result)
     }
 }

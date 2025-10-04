@@ -22,7 +22,7 @@ pub struct MatchedRestingOrder {
 /// The implementation will be external to this file.
 pub trait ResultSender: Send + Sync {
     // Added Send + Sync for concurrent use
-    fn send_result(&self, result: MatchResult);
+    async fn send_result(&self, result: MatchResult);
 }
 
 // --- OrderBook Definition ---
@@ -129,7 +129,12 @@ impl OrderBook {
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
-
+        println!(
+            "get a new order {:?} and bids size {:?} asks size: {:?}",
+            new_order.clone(),
+            self.bids.read().await.len(),
+            self.asks.read().await.len()
+        );
         if new_order.order_type == ORDER_TYPE_SELL {
             // New order is a SELL, match against Bids (BUY side)
             matched_orders.extend(
@@ -158,6 +163,7 @@ impl OrderBook {
             self.fuel_order(new_order).await;
         }
 
+        println!("get a new matched_orders {:?}", matched_orders.clone());
         matched_orders
     }
 
@@ -295,8 +301,9 @@ impl OrderBook {
 
             // Loop continues to check if more orders can be matched.
         }
-
-        matched_orders
+        let result = matched_orders.clone();
+        self.post_match(matched_orders).await;
+        result
     }
 
     // --- Phase 4: Post Match Processing ---

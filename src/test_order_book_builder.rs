@@ -2,14 +2,9 @@ use crate::data_types::{
     EngineState, ORDER_PRICE_TYPE_LIMIT, ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
 };
 
-use crate::message_codec;
-
 use std::sync::Arc;
 
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::net::UdpSocket;
-use tokio::sync::mpsc::Sender;
-use tokio::time::{self, Duration};
 
 /// Handler responsible for receiving incoming network messages (Orders/Cancels).
 pub struct TestOrderBookBuilder {
@@ -31,11 +26,11 @@ impl TestOrderBookBuilder {
         let order_book = self.state.order_book.clone();
         for i in 0..self.test_order_book_size {
             let order = self.create_buy_order(i);
-            order_book.fuel_order(order);
+            order_book.fuel_order(order).await;
         }
         for i in 0..self.test_order_book_size {
             let order = self.create_sell_order(i, self.test_order_book_size);
-            order_book.fuel_order(order);
+            order_book.fuel_order(order).await;
         }
     }
     pub fn create_buy_order(&self, index: u32) -> Order {
