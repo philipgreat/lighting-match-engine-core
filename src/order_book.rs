@@ -167,12 +167,12 @@ impl OrderBook {
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
 
-        println!(
-            "get a new order {:?} and bids size {:?} asks size: {:?}",
-            new_order.clone(),
-            self.bids.read().await.len(),
-            self.asks.read().await.len()
-        );
+        // println!(
+        //     "get a new order {:?} and bids size {:?} asks size: {:?}",
+        //     new_order.clone(),
+        //     self.bids.read().await.len(),
+        //     self.asks.read().await.len()
+        // );
         let start_time = current_timestamp();
         if new_order.order_type == ORDER_TYPE_SELL {
             // New order is a SELL, match against Bids (BUY side)
