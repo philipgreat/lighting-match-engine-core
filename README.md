@@ -1,5 +1,24 @@
 # Lighting Match Engine Core
 
+## Table of Contents
+
+- [Order types](#order-types)
+- [Policies](#policies)
+- [Time and package size](#time-and-package-size)
+- [Why fast](#why-fast)
+- [Why reliable](#why-reliable)
+- [Make reliable](#make-reliable)
+- [Quick start](#quick-start)
+- [How it works](#how-it-works)
+- [Source Files](#source-files)
+- [How network used](#how-network-used)
+- [Deployment](#deployment)
+- [SDK & Testing tool](#sdk--testing-tool)
+- [In scope and NOT in scope](#in-scope-and-not-in-scope)
+- [Limitations](#limitations)
+- [License](#license)
+- [Contact](#contact)
+
 **RUST IS BORN for MATCHING ENGINES**
 
 A minized lighting fast matching engine core, focusing on mathing only.
