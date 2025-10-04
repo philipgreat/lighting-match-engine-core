@@ -406,4 +406,85 @@ impl OrderBook {
         self.prepare_bids_index().await;
         self.prepare_asks_index().await;
     }
+
+    /// Attempts to cancel an order by its ID.
+    /// Returns `true` if the order was found and canceled, `false` otherwise.
+    pub async fn cancel_order(&self, order_id: u64) -> bool {
+        // --- 1. Scan Bids and Asks for Order ID to get the array index ---
+        // This array index is needed for removal and to check the top index vector.
+
+        let mut order_array_index: Option<(OrderIndex, bool)> = None; // (index, is_buy)
+
+        // Acquire read locks on bids and asks
+        let bids_guard = self.bids.read().await;
+        let asks_guard = self.asks.read().await;
+
+        // Search Bids for the Order ID
+        if let Some((index, _)) = bids_guard
+            .iter()
+            .enumerate()
+            .find(|(_, order)| order.order_id == order_id)
+        {
+            order_array_index = Some((index as OrderIndex, true));
+        }
+
+        // Search Asks for the Order ID
+        if order_array_index.is_none() {
+            if let Some((index, _)) = asks_guard
+                .iter()
+                .enumerate()
+                .find(|(_, order)| order.order_id == order_id)
+            {
+                order_array_index = Some((index as OrderIndex, false));
+            }
+        }
+
+        // Drop read locks on bids/asks
+        drop(bids_guard);
+        drop(asks_guard);
+
+        let (index_to_remove, is_buy) = match order_array_index {
+            Some(data) => data,
+            None => return false, // Order not found, nothing to cancel
+        };
+
+        // --- 2. Scan Top Index and Clear if Order is in the Top ---
+        let mut top_index_write_guard = if is_buy {
+            self.top_bids_index.write().await
+        } else {
+            self.top_asks_index.write().await
+        };
+
+        // If the order's array index is present in the top index list, clear the list.
+        if top_index_write_guard.contains(&index_to_remove) {
+            top_index_write_guard.clear();
+        }
+
+        // Drop the write lock on the top index
+        drop(top_index_write_guard);
+
+        // --- 3. Remove from Bids or Asks Array ---
+
+        // Acquire the write lock on the correct order vector
+        if is_buy {
+            let mut bids_guard = self.bids.write().await;
+            // Remove the order. Note: Vec::remove is O(N) but simplifies the example.
+            if (index_to_remove as usize) < bids_guard.len() {
+                bids_guard.remove(index_to_remove as usize);
+            }
+            drop(bids_guard); // Release lock before re-indexing
+        } else {
+            let mut asks_guard = self.asks.write().await;
+            if (index_to_remove as usize) < asks_guard.len() {
+                asks_guard.remove(index_to_remove as usize);
+            }
+            drop(asks_guard); // Release lock before re-indexing
+        }
+
+        // --- 4. Rebuild the indices ---
+        // Must be done after removal because array indices for other orders may have changed.
+        self.prepare_index().await;
+
+        true // Order was successfully canceled
+    }
 }

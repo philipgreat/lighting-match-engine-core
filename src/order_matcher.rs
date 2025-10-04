@@ -75,7 +75,7 @@ impl OrderMatcher {
     async fn handle_order_cancellation(&self, order_id_to_cancel: u64) {
         let mut order_book = self.state.order_book.clone();
 
-        //order_book.cancel_order(order_id_to_cancel);
+        order_book.cancel_order(order_id_to_cancel).await;
     }
 }
 impl ResultSender for OrderMatcher {

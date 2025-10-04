@@ -64,7 +64,7 @@ pub struct MatchResult {
     pub sell_order_id: u64,       // Seller's order ID (8 bytes)
     pub price: u64,               // Trade price (8 bytes)
     pub quantity: u32,            // Trade quantity (4 bytes)
-    pub trade_time_network: u32,  // Trade timestamp (Nanoseconds) (8 bytes)
+    pub trade_time_network: u32,  // Trade timestamp (Nanoseconds) (4 bytes)
     pub internal_match_time: u32, // Total Payload Size: 46 bytes
 }
 
