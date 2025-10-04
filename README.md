@@ -1,212 +1,109 @@
-# Lighting Match Engine Core
+# 🔥 Lighting Match Engine Core 🔥
 
-## Table of Contents
+**Built with Rust for Blazing-Fast Performance**
 
-- [Order types](#order-types)
-- [Policies](#policies)
-- [Time and package size](#time-and-package-size)
-- [Why fast](#why-fast)
-- [Why reliable](#why-reliable)
-- [Make reliable](#make-reliable)
-- [Quick start](#quick-start)
-- [How it works](#how-it-works)
-- [Source Files](#source-files)
-- [How network used](#how-network-used)
-- [Deployment](#deployment)
-- [SDK & Testing tool](#sdk--testing-tool)
-- [In scope and NOT in scope](#in-scope-and-not-in-scope)
-- [Limitations](#limitations)
-- [License](#license)
-- [Contact](#contact)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-1.70.0-orange.svg)](https://www.rust-lang.org/)
+[![Build Status](https://img.shields.io/travis/com/philipgreat/lighting-match-engine-core.svg)](https://travis-ci.com/philipgreat/lighting-match-engine-core)
 
-**RUST IS BORN for MATCHING ENGINES**
+The Lighting Match Engine Core is a minimal, lighting-fast matching engine designed for a single purpose: **matching orders with extreme speed and reliability**.
 
-A minized lighting fast matching engine core, focusing on mathing only.
-No assumptions, an instance serves one product only.
+It's a focused, no-frills engine that you can build upon. Each instance serves a single product, making it highly efficient and scalable.
 
-Products can be:
+## 🚀 Why Choose Lighting Match Engine Core?
 
-* Stock Trading: Like AAPL, TSLA, Meta
-* Cryptocurrency Trading Pairs: BTC-USDT, ETH-USDT, XRP-USDT
-* Futures Contracts: Like S&P 500 futures, Oil futures
-* Options Trading: Like call and put options on stocks or indices
-* Forex Trading: Like USD/EUR, GBP/JPY
-* Commodity Trading: Like Gold, Silver, Crude Oil
-* Derivatives Markets: Like CFDs (Contracts for Difference)
-* NFT Markets: Like NFT auctions and buy/sell orders
-* Peer-to-Peer (P2P) Trading Platforms: Like decentralized exchanges (DEXs) for token swaps
-* Real Estate: Like property listing matching for rental or purchase
+*   **⚡️ Blazing Fast:** Written in Rust, it's designed for performance. We're talking nanosecond-level precision.
+*   **💪 Reliable:** With minimal dependencies (only Tokio for networking), the engine is incredibly stable.
+*   **💡 Simple & Focused:** It does one thing and does it well: matching. No unnecessary features, no bloat.
+*   **🌐 Universal:** Use it for a wide range of products:
+    *   Stocks & Cryptocurrencies
+    *   Futures & Options
+    *   Forex & Commodities
+    *   NFTs & Real Estate
+    *   ...and much more!
 
-All the products can be encoded as a number less than 65535, 0 is reseve for online testing
+## ✨ Key Features
 
+*   **Order Types:** Market and Limit orders.
+*   **Matching Policies:** Price-first, time-first.
+*   **High Precision:** Time is measured in nanoseconds.
+*   **Lean & Mean:** 50-byte package size for efficient network communication.
+*   **In-Memory Processing:** All operations happen in memory for maximum speed.
+*   **UDP Multicast:** Orders are received via UDP multicast for low-latency communication.
 
+## 🛠️ Quick Start
 
-## Order types
+Get up and running in minutes!
 
-* Market order
-* Limit orders
+1.  **Start the Engine:**
 
-## Policies
+    ```bash
+    cargo run -- --prodid 7 --tag FIX009 --test-order-book-size 10k
+    ```
 
-* Prices first
-* Time first
+    This command starts an engine instance for product `7` with the tag `FIX009` and a test order book of 10,000 buy and sell orders.
 
-## Time and package size
-* All time using nano second as the time unit, most hardware support u seconds precison, some hardware support higher precision timing.
-* All package size are 50 bytes
+2.  **Submit an Order:**
 
-## Why fast
+    Clone our command-line tool and submit an order:
 
-* Only a single asset per running instance
-* Minimize depencies only tokio for networking
-* Do things that Rust is good at
-* No DB
-* No remote cache
-* No JSON
-* No file reading/writes
-* No computing with strings, floats, only integeral types
-* Purely in memory except rebuild the order book
-* Recieving orders by UDP multicast
-* Keep code lines less than 2000 （now it is 1500）
-* 50 bytes per package
+    ```bash
+    git clone https://github.com/philipgreat/match-engine-cmd-tool
+    cd match-engine-cmd-tool
+    cargo run -- submit --order-type=sell --product-id=7 --price=1 --quantity=1 --price-type=limit
+    ```
 
-## Why reliable
+3.  **See the Magic:**
 
-* Only tokio used as third party crates.
-* Keeping less changes
+    You'll see a match result like this:
 
-## Make reliable
+    ```
+    MatchResult {
+      instance_tag: [68, 69, 70, 65, 85, 76, 84, 0],
+      product_id: 7, buy_order_id: 9673, sell_order_id: 1759453532072894008,
+      price: 9673, quantity: 1,
+      trade_time_network: 99351,
+      internal_match_time: 52125
+    }
+    ```
 
-* Running two or more instances
+    That's an internal match time of just **52,125 nanoseconds**!
 
-## Quick start
+## ⚙️ How It Works
 
-Quick Start: Launching the Matching Engine
-The simplest way to start the engine is by specifying the two required parameters: the instance tag ( --tag) and the product ID (--prodid).
+The engine follows a simple, robust workflow:
 
-Example Command:
+1.  **Rebuild Order Book:** The order book is rebuilt from an order book fuel server (not included in this project).
+2.  **Receive Orders:** The engine listens for incoming order requests via UDP.
+3.  **Match Orders:** The core matching logic is executed.
+4.  **Broadcast Results:** Matching results are broadcast to the network.
 
-Run an engine with 10k sell and buy respectively
+## 🧩 What's in the Box (and What's Not)
 
-```bash
-cargo run -- --prodid 7 --tag FIX009 --test-order-book-size 10k
-```
-Open another terminal
+This engine is the core of a trading system. You'll need to build the surrounding systems to create a complete solution.
 
-```bash
-git clone https://github.com/philipgreat/match-engine-cmd-tool
-cd match-engine-cmd-tool
-cargo run -- submit --order-type=sell --product-id=7 --price=1 --quantity=1 --price-type=limit
+**In Scope:**
 
-```
+*   A simple, robust, and fast matching engine.
 
-Observe match result, then you can see some result like this:
+**Out of Scope:**
 
-```
-MatchResult {
-  instance_tag: [68, 69, 70, 65, 85, 76, 84, 0],
-  product_id: 7, buy_order_id: 9673, sell_order_id: 1759453532072894008,
-  price: 9673, quantity: 1,
-  trade_time_network: 99351,
-  internal_match_time: 52125
-}
-```
+*   Product Management System
+*   Market Data System
+*   Order Management System (OMS)
+*   Risk Management System
+*   ...and other external systems.
 
-The result is generated from a server with CPU running Ubuntu
+## 🤝 Contributing
 
-```
-vendor_id	: GenuineIntel
-cpu family	: 6
-model		: 167
-model name	: Intel(R) Xeon(R) E-2314 CPU @ 2.80GHz
-```
+We welcome contributions from the community! Whether you want to fix a bug, add a feature, or improve the documentation, we'd love to have your help.
 
-The internal match time is 52125 **nano** seconds and the total time from submitting an order by UDP is 99us.
+## 📜 License
 
+This project is licensed under the [MIT License](./LICENSE.md).
 
-Explanation:
+## 💬 Contact
 
-This command launches an engine instance with the unique identifier TFX01 (the instance tag) dedicated to matching orders for Product 505. All network communication will use the default multicast addresses (224.0.0.1:5000 for trades and 224.0.0.2:5000 for status).
+Have questions or want to get involved?
 
-Note: The instance tag (--tag) must be 8 characters or less.
-
-
-## How it works
-
-* Rebuild order book from order book fuel server(order book fuel server is NOT in the project)
-* Recieving order request when order book has been built
-* Test match
-* Broadcasting matching result
-
-## Source Files
-
-* main.rs: the entry point
-* network_handler: handling communication
-* data_type: data types used in the engine
-* engine_stats.rs: holding order and broad casting stats
-* order_matcher.rs: the core logic of matching orders
-* message_codec.rs: encode/decode network messages
-* broadcast_handler.rs: broadcast messages
-
-## How network used
-
-* UDP: getting orders, broading casting engine stats
-* TCP: use for order book rebuilding only
-
-## Deployment
-
-* In a network supporting multicasting
-* Docker: with --network host
-* Kubernates: [Config k8s](./docs/config-k8s-network.md)
-
-## SDK & Testing tool
-
-We are planning to build Java and Rust sdk. Currently not availiable yet.
-
-Testbench is WIP.
-
-## In scope and NOT in scope
-
-This is not subject to do everyting, the secrets of fast and reliable is KISS(simple and stupid)
-
-What is IN scope
-
-* A SIMPLE, ROBUST system handling large orderbook process need many external tools to work with
-
-External systems you may need and NOT in scope
-
-* Product Management System to define what can be trade to present to end user and control the changes within an organzation and maps products id as a valid long type, less than 65535
-
-* Market Data System: Provides real-time and historical market data, ensuring the trading system has accurate price feeds and market insights.
-
-* Order Management System (OMS): Manages and routes orders to the appropriate execution venues, ensuring efficient order processing and tracking.
-
-* Risk Management System: Monitors and enforces risk controls, ensuring trades comply with predefined limits and minimizing exposure to significant losses.
-
-* Clearing and Settlement System: Handles the confirmation, clearing, and settlement of trades, ensuring proper transfer of funds and assets.
-
-* Trade Surveillance and Compliance System: Monitors trading activity to detect and prevent market manipulation and ensures adherence to regulatory requirements.
-
-* Liquidity Management System: Ensures that there is enough liquidity available to match orders quickly, preventing slippage and improving trade execution.
-
-* Backtesting System: Tests trading strategies against historical data to evaluate their performance before deployment in a live environment.
-
-* Data Storage and Analytics System: Stores vast amounts of trading and market data, providing powerful analytics and performance insights for strategy improvement.
-
-* Security and Authentication System: Protects the trading platform and user data by enforcing security protocols, such as encryption and two-factor authentication.
-
-* Payment and Wallet System (For Cryptocurrency): Manages deposits, withdrawals, and balances for digital assets, ensuring smooth transactions in cryptocurrency exchanges.
-
-## Limitations
-
-* Max 65535 products
-* Price from 0 to 2**64
-* Order id from 0 to 2**64
-
-## License
-
-[MIT License](./LICENSE.md)
-
-## Contact
-
-* Telegram: <https://t.me/philip_is_online>
+*   **Telegram:** <https://t.me/philip_is_online>
