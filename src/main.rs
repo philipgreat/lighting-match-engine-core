@@ -8,6 +8,7 @@ mod broadcast_handler;
 mod data_types;
 mod date_time_tool;
 mod engine_state;
+mod high_resolution_timer;
 mod message_codec;
 mod network_handler;
 mod number_tool;

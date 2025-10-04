@@ -1,4 +1,5 @@
 use crate::date_time_tool::current_timestamp;
+use crate::high_resolution_timer::HighResultionCounter;
 use tokio::sync::RwLock;
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
@@ -215,6 +216,7 @@ impl OrderBook {
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
         let start_time = current_timestamp();
+        let timer = HighResultionCounter::start(3.0);
         loop {
             // Break condition: new order is fully filled.
             if new_order.quantity == 0 {
@@ -306,7 +308,10 @@ impl OrderBook {
             } else {
                 (resting_order.order_id, new_order.order_id)
             };
-            let end_time = current_timestamp();
+
+            let time_lapsed = timer.ns();
+            let end_time = start_time + (time_lapsed as u64);
+
             let match_result = MatchResult {
                 // ... (fields populated) ...
                 instance_tag: [0; 8],
@@ -316,7 +321,7 @@ impl OrderBook {
                 price: trade_price,
                 quantity: trade_quantity,
                 trade_time_network: (end_time - new_order.submit_time) as u32,
-                internal_match_time: (end_time - start_time) as u32,
+                internal_match_time: (time_lapsed) as u32,
             };
 
             sender.send_result(match_result).await;
