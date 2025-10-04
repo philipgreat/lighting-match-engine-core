@@ -47,7 +47,8 @@ pub struct CancelOrder {
 pub struct BroadcastStats {
     pub instance_tag: [u8; 8],      // 8-byte engine instance tag
     pub product_id: u16,            // Product identifier (2 bytes)
-    pub order_book_size: u32,       // Current order book size (4 bytes)
+    pub bids_size: u32,             // Current order book size (4 bytes)
+    pub ask_size: u32,              // Current order book size (4 bytes)
     pub matched_orders: u32,        // Total matched orders count (4 bytes)
     pub total_received_orders: u32, // Total received orders count (4 bytes)
     pub start_time: u64,            // Program start time (Nanoseconds) (8 bytes)
@@ -77,31 +78,27 @@ pub enum IncomingMessage {
 // Type alias for indexing into the main orders Vec.
 // u32 is used to maximize CPU cache density for indexing, covering up to 4.2 billion orders.
 pub type OrderIndex = u32;
-#[derive(Debug)]
-pub struct PriceLevel {
-    // A double-ended queue holding indexes to the orders Vec.
-    // The front() is the oldest order (Time Priority).
-    pub indexes: VecDeque<OrderIndex>,
+
+pub trait ResultSender: Send + Sync {
+    fn send_result(&self, result: MatchResult);
 }
 
 #[derive(Debug)]
 // The core Order Book structure (T in Vec<T>)
 // This implements the layered indexing (Price-Time Priority).
+
 pub struct OrderBook {
-    // 1. Data Store: A single contiguous vector holding all actual order data.
-    // Indexing this Vec is O(1) and maximizes cache locality.
-    pub orders: Vec<Order>,
+    // Vectors to hold the actual orders. Bids: best to worst. Asks: best to worst.
+    pub bids: RwLock<Vec<Order>>,
+    pub asks: RwLock<Vec<Order>>,
 
-    // 2. Buy-side Index: Bids are sorted by Price (highest price first).
-    // BTreeMap keys are u64 (Price) -> Value is the PriceLevel.
-    pub bids: BTreeMap<u64, PriceLevel>,
+    // Vectors to hold the indices of the best orders.
+    pub top_bids_index: RwLock<Vec<OrderIndex>>,
+    pub top_asks_index: RwLock<Vec<OrderIndex>>,
 
-    // 3. Sell-side Index: Asks are sorted by Price (lowest price first).
-    pub asks: BTreeMap<u64, PriceLevel>,
-
-    // 4. Lookup: Maps Order ID to its O(1) index in the 'orders' Vec.
-    // Used for quick removal/cancellation and order status lookup.
-    pub id_to_index: BTreeMap<u64, OrderIndex>,
+    // Configuration
+    pub init_order_book_size: u32,
+    pub init_top_index_size: u32,
 }
 
 // Engine State and Context
@@ -110,7 +107,7 @@ pub struct EngineState {
     pub instance_tag: [u8; 8],
     pub product_id: u16,
     // Order Book
-    pub order_book: Arc<RwLock<OrderBook>>,
+    pub order_book: Arc<OrderBook>,
     // Counters
     pub matched_orders: std::sync::Arc<RwLock<u64>>,
     pub total_received_orders: std::sync::Arc<RwLock<u64>>,

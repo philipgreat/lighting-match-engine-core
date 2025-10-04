@@ -2,6 +2,7 @@ use crate::data_types::{
     EngineState, IncomingMessage, MatchResult, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET,
     ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
 };
+use crate::order_book::ResultSender;
 
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -51,66 +52,6 @@ impl OrderMatcher {
         now_nanos
     }
 
-    async fn find_best_match_index(
-        &self,
-        new_order: &Order,
-        // 移除了 is_buy: bool, is_limit: bool,
-    ) -> Option<usize> {
-        // ⭐ 优化点 1: 在方法内部推导出布尔值
-        let is_buy = new_order.order_type == ORDER_TYPE_BUY;
-        let is_limit = new_order.price_type == ORDER_PRICE_TYPE_LIMIT;
-        let order_book = self.state.get_order_book_to_read().await;
-        // 1. Filter out all potential counter-orders that satisfy the cross-price condition.
-        let potential_matches: Vec<usize> = order_book
-            .iter()
-            .enumerate()
-            .filter_map(|(i, existing_order)| {
-                let is_opposite_side = existing_order.order_type != new_order.order_type;
-
-                if !is_opposite_side {
-                    return None; // Must be opposite side (Buy vs. Sell)
-                }
-
-                // Check if the price condition is met (i.e., the price crosses)
-                let price_condition_met = (is_buy && existing_order.price <= new_order.price) || // New Buy matches existing Sell <= Buyer's Limit Price
-                                          (!is_buy && existing_order.price >= new_order.price); // New Sell matches existing Buy >= Seller's Limit Price
-
-                // Market orders match any counter-side order regardless of price
-                let market_order_match =
-                    new_order.price_type == ORDER_PRICE_TYPE_MARKET && is_opposite_side;
-
-                if (is_limit && price_condition_met) || market_order_match {
-                    Some(i)
-                } else {
-                    None
-                }
-            })
-            .collect(); // Collect indices of all executable orders
-
-        // 2. Apply "Price Priority then Time Priority" using min_by
-        potential_matches.into_iter().min_by(|&i_a, &i_b| {
-            let order_a = &order_book.get_value(i_a).expect("not able to find order");
-            let order_b = &order_book.get_value(i_b).expect("not able to find order");
-
-            // --- Price Priority ---
-            let price_cmp = if is_buy {
-                // When the new order is a Buy, we look for the cheapest Sell (Lowest Price is Best)
-                order_a.price.cmp(&order_b.price)
-            } else {
-                // When the new order is a Sell, we look for the most expensive Buy (Highest Price is Best)
-                // Reverse the comparison (b vs a) to find the maximum price using min_by.
-                order_b.price.cmp(&order_a.price)
-            };
-
-            if price_cmp != Ordering::Equal {
-                return price_cmp;
-            }
-
-            // --- Time Priority ---
-            // If prices are equal, use Time Priority (Earliest submit_time is Best).
-            order_a.submit_time.cmp(&order_b.submit_time)
-        })
-    }
     /// Handles an incoming order (Limit or Market).
     async fn handle_order_submission(&self, new_order: Order) {
         // Only process orders for the configured product_id
@@ -122,13 +63,10 @@ impl OrderMatcher {
             return;
         }
 
-        let mut order_book = self.state.order_book.write().await;
-        if order_book.is_empty() {
-            println!("no orders in book: {:?}", order_book);
-            order_book.push(new_order);
-            return;
-        }
+        let order_book = self.state.order_book.clone();
+        order_book.match_order(new_order, self).await;
 
+        //order_book.match_order(new_order, sender)
         // 1. Pre-matching clean-up: Remove expired orders
         //self.cleanup_expired_orders(new_order.clone(), &mut order_book);
         // println!(
@@ -137,108 +75,21 @@ impl OrderMatcher {
         // );
 
         // 2. Execute matching
-        self.match_orders(new_order).await;
+        //self.match_orders(new_order).await;
     }
 
     /// Removes expired orders and the order with same id from the order book.
 
     /// Handles order cancellation by removing the matching order from the book.
     async fn handle_order_cancellation(&self, order_id_to_cancel: u64) {
-        let mut order_book = self.state.get_order_book_to_write().await;
+        let mut order_book = self.state.order_book.clone();
 
-        order_book.cancel_order(order_id_to_cancel);
+        //order_book.cancel_order(order_id_to_cancel);
     }
-
-    /// Core matching logic (Price/Time Priority).
-    async fn match_orders(&self, mut new_order: Order) {
-        let is_limit = new_order.price_type == ORDER_PRICE_TYPE_LIMIT;
-        let is_buy = new_order.order_type == ORDER_TYPE_BUY;
-
-        let mut matches_occurred = true;
-
-        //println!("========>order size for matching {:?}", book.len());
-        let mut order_book = self.state.get_order_book_to_write().await;
-        if order_book.is_empty() {
-            //println!("========> no orders in book: {:?}", book);
-            order_book.push(new_order);
-            return;
-        }
-
-        let start_time = Self::current_timestamp();
-
-        while new_order.quantity > 0 && matches_occurred {
-            matches_occurred = false;
-            //println!("1======>check new order {:?} is comming", new_order);
-            // 1. Find the best potential match index based on price and time
-            let best_match_index = self.find_best_match_index(&new_order).await;
-
-            //println!("best match index {:?} ", best_match_index);
-
-            if let Some(i) = best_match_index {
-                //println!("match!!!!");
-                // We found a match!
-                matches_occurred = true;
-                let mut existing_order = order_book.remove(i);
-
-                let trade_qty = std::cmp::min(new_order.quantity, existing_order.quantity);
-                let trade_price = existing_order.price; // Maker (existing) price is always the trade price
-
-                // 3. Update remaining quantities
-                new_order.quantity -= trade_qty;
-                existing_order.quantity -= trade_qty;
-
-                // 4. Create MatchResult
-                let match_result = MatchResult {
-                    instance_tag: self.state.instance_tag,
-                    product_id: self.state.product_id,
-                    buy_order_id: if is_buy {
-                        new_order.order_id
-                    } else {
-                        existing_order.order_id
-                    },
-                    sell_order_id: if !is_buy {
-                        new_order.order_id
-                    } else {
-                        existing_order.order_id
-                    },
-                    price: trade_price,
-                    quantity: trade_qty,
-                    trade_time_network: (Self::current_timestamp() - new_order.submit_time) as u32,
-                    internal_match_time: (Self::current_timestamp() - start_time) as u32,
-                };
-                //println!("=========>result generated");
-                // 5. Broadcast the match result
-                if let Err(e) = self.sender.send(match_result).await {
-                    eprintln!("Error sending match result: {}", e);
-                }
-
-                // 6. Update matched orders counter
-                let mut matched_count = self.state.matched_orders.write().await;
-                *matched_count += 1;
-
-                // 7. If the existing order has remaining quantity, push it back
-                if existing_order.quantity > 0 {
-                    // Note: Order is Copyable, so we clone to push back, retaining the original
-                    // instance for further potential match result reporting if needed (though not strictly necessary here, it's safer).
-                    // Since Order does not implement Copy, we must use clone()
-                    order_book.push(existing_order.clone());
-                }
-            }
-        }
-
-        // 8. If the new order is a Limit Order and has remaining quantity, add it to the book
-        if new_order.quantity > 0 && is_limit {
-            order_book.push(new_order);
-            println!(
-                "Added partial or full Limit Order to book. Qty Left: {}",
-                order_book.last().unwrap().quantity
-            );
-        } else if new_order.quantity > 0 && new_order.price_type == ORDER_PRICE_TYPE_MARKET {
-            println!(
-                "Unfilled Market Order discarded. Qty Left: {}",
-                new_order.quantity
-            );
-            println!("order data {:?}", new_order);
-        }
+}
+impl ResultSender for OrderMatcher {
+    /// Implements the required method to send a MatchResult.
+    fn send_result(&self, result: MatchResult) {
+        println!("result to send: {:?}", result)
     }
 }

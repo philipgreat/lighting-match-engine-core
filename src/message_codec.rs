@@ -116,7 +116,10 @@ pub fn serialize_stats_result(stats: &BroadcastStats) -> [u8; MESSAGE_TOTAL_SIZE
 
     // 3. Order Book Size (u32)
     // Size: 4 bytes (FIXED from u64)
-    buf[current_idx..current_idx + 4].copy_from_slice(&stats.order_book_size.to_be_bytes());
+    buf[current_idx..current_idx + 4].copy_from_slice(&stats.bids_size.to_be_bytes());
+    current_idx += 4; // Index: 16
+
+    buf[current_idx..current_idx + 4].copy_from_slice(&stats.ask_size.to_be_bytes());
     current_idx += 4; // Index: 16
 
     // 4. Matched Orders (u32)
