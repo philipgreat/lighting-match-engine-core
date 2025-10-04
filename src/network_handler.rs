@@ -94,8 +94,8 @@ impl NetworkHandler {
             MSG_ORDER_CANCEL => match message_codec::deserialize_cancel_order(payload) {
                 Ok(cancel) => {
                     println!(
-                        "[LOG] Cancel Order: ProdID={}, OrderID={}",
-                        cancel.product_id, cancel.order_id
+                        "[LOG] Cancel Order: ProdID={}, OrderIDs={:?}",
+                        cancel.product_id, cancel.order_ids
                     );
                     let mut total_count = self.state.total_received_orders.write().await;
                     *total_count += 1;

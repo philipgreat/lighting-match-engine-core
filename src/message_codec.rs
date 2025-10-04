@@ -2,12 +2,13 @@ use crate::data_types::{
     BroadcastStats, CancelOrder, MESSAGE_TOTAL_SIZE, MSG_ORDER_CANCEL, MSG_ORDER_SUBMIT,
     MSG_STATUS_BROADCAST, MSG_TRADE_BROADCAST, MatchResult, Order,
 };
-
+pub const MAX_IDS_PER_CHUNK: usize = 5;
+pub const PAYLOAD_START: usize = 2;
 /// Calculates a simple XOR checksum for the payload starting after the type byte (index 2).
 /// The buffer must be at least 2 bytes long.
 fn calculate_checksum(buf: &[u8]) -> u8 {
-    // Checksum is calculated over the payload (index 2 onwards)
-    buf[2..].iter().fold(0, |acc, &x| acc ^ x)
+    // Checksum is calculated over the payload (index 1 onwards)
+    buf[1..].iter().fold(0, |acc, &x| acc ^ x)
 }
 
 /// Serializes an Order struct into a 50-byte network buffer.
@@ -41,19 +42,52 @@ pub fn serialize_order(order: &Order) -> [u8; MESSAGE_TOTAL_SIZE] {
 }
 
 /// Serializes a CancelOrder struct into a 50-byte network buffer.
-pub fn serialize_cancel_order(cancel: &CancelOrder) -> [u8; MESSAGE_TOTAL_SIZE] {
+pub fn serialize_cancel_order_chunk(
+    cancel: &CancelOrder,
+    start_index: usize,
+) -> [u8; MESSAGE_TOTAL_SIZE] {
     let mut buf = [0u8; MESSAGE_TOTAL_SIZE];
-    let payload_start = 2;
+    let mut offset = PAYLOAD_START; // Start after Checksum (0) and Msg Type (1)
 
-    buf[1] = MSG_ORDER_CANCEL;
+    // --- 1. 序列化 Product ID (u16, 2 bytes, Big Endian) ---
+    buf[offset..offset + 2].copy_from_slice(&cancel.product_id.to_be_bytes());
+    offset += 2; // offset = 4
 
-    // Product ID (u16)
-    buf[payload_start..payload_start + 2].copy_from_slice(&cancel.product_id.to_be_bytes());
-    // Order ID (u64)
-    buf[payload_start + 2..payload_start + 10].copy_from_slice(&cancel.order_id.to_be_bytes());
+    // --- 2. 序列化 Order IDs (u64, 5 * 8 bytes) ---
 
-    // Checksum calculation and placement
-    buf[0] = calculate_checksum(&buf);
+    let total_orders = cancel.order_ids.len();
+    let end_index = (start_index + MAX_IDS_PER_CHUNK).min(total_orders);
+
+    let mut current_id_index = start_index;
+
+    // 我们必须迭代 5 次，以填充 5 个 u64 的固定空间
+    for _ in 0..MAX_IDS_PER_CHUNK {
+        let order_id;
+
+        if current_id_index < end_index {
+            // 如果列表还有订单 ID，使用它
+            order_id = cancel.order_ids[current_id_index];
+            current_id_index += 1;
+
+            // 业务规则检查：不允许序列化 0 作为有效 ID
+            if order_id == 0 {
+                panic!("Order ID cannot be 0, as 0 is reserved for padding/invalid ID.");
+            }
+        } else {
+            // 列表已用完，使用 0 填充以满足固定大小
+            order_id = 0u64;
+        }
+
+        // 写入 8 字节
+        buf[offset..offset + 8].copy_from_slice(&order_id.to_be_bytes());
+        offset += 8;
+    }
+    // 此时 offset 应该为 4 + (5 * 8) = 44。
+    // buf[44..50] 是未使用的空间，保持为 0。
+
+    // --- 3. 消息类型和校验和 (略 - 假设已定义) ---
+    // buf[1] = MSG_ORDER_CANCEL;
+    // buf[0] = calculate_checksum(&buf);
 
     buf
 }
@@ -192,16 +226,48 @@ pub fn deserialize_order(payload: &[u8]) -> Result<Order, &'static str> {
 }
 
 /// Deserializes a payload slice into a CancelOrder struct.
-pub fn deserialize_cancel_order(payload: &[u8]) -> Result<CancelOrder, &'static str> {
-    if payload.len() < 10 {
-        return Err("CancelOrder payload too short");
+pub fn deserialize_cancel_order(buf: &[u8]) -> Result<CancelOrder, &'static str> {
+    // Start offset after Checksum (buf[0]) and Msg Type (buf[1])
+    let mut offset = PAYLOAD_START + size_of::<u8>(); // offset starts at 2
+
+    // --- 1. Decode Product ID (u16, 2 bytes, Big Endian) ---
+    // Reads buf[2..4]
+    if offset + size_of::<u16>() > MESSAGE_TOTAL_SIZE {
+        return Err("Buffer too short for Product ID.");
     }
+    let mut product_id_bytes = [0u8; 2];
+    product_id_bytes.copy_from_slice(&buf[offset..offset + 2]);
+    let product_id = u16::from_be_bytes(product_id_bytes);
+    offset += 2; // offset = 4
 
-    let product_id = u16::from_be_bytes(payload[0..2].try_into().unwrap());
-    let order_id = u64::from_be_bytes(payload[2..10].try_into().unwrap());
+    // --- 2. Decode Order IDs (u64, 5 * 8 bytes) ---
 
+    let mut order_ids = Vec::with_capacity(MAX_IDS_PER_CHUNK);
+
+    // We iterate exactly MAX_IDS_PER_CHUNK times (5 times) to cover the fixed payload structure.
+    for _ in 0..MAX_IDS_PER_CHUNK {
+        // Check bounds for the current 8-byte u64 slot
+        if offset + size_of::<u64>() > MESSAGE_TOTAL_SIZE {
+            return Err("Packet truncated: Expected 5 order ID slots not found.");
+        }
+
+        // Decode 8 bytes (reads buf[offset..offset+8])
+        let mut order_id_bytes = [0u8; 8];
+        order_id_bytes.copy_from_slice(&buf[offset..offset + 8]);
+        let order_id = u64::from_be_bytes(order_id_bytes);
+
+        // if order ==0 discard
+        if order_id != 0 {
+            order_ids.push(order_id);
+        }
+
+        offset += 8;
+    }
+    // 此时 offset = 4 + 5*8 = 44。
+
+    // --- 3. Construct Final Struct ---
     Ok(CancelOrder {
         product_id,
-        order_id,
+        order_ids,
     })
 }

@@ -36,7 +36,7 @@ impl OrderMatcher {
             match msg {
                 IncomingMessage::Order(order) => self.handle_order_submission(order).await,
                 IncomingMessage::Cancel(cancel) => {
-                    self.handle_order_cancellation(cancel.order_id).await
+                    self.handle_order_cancellation(cancel.order_ids).await
                 }
             }
         }
@@ -72,10 +72,10 @@ impl OrderMatcher {
     /// Removes expired orders and the order with same id from the order book.
 
     /// Handles order cancellation by removing the matching order from the book.
-    async fn handle_order_cancellation(&self, order_id_to_cancel: u64) {
-        let mut order_book = self.state.order_book.clone();
+    async fn handle_order_cancellation(&self, cancel_order_ids: Vec<u64>) {
+        let order_book = self.state.order_book.clone();
 
-        order_book.cancel_order(order_id_to_cancel).await;
+        order_book.cancel_order(cancel_order_ids).await;
     }
 }
 impl ResultSender for OrderMatcher {

@@ -409,10 +409,10 @@ impl OrderBook {
 
     /// Attempts to cancel an order by its ID.
     /// Returns `true` if the order was found and canceled, `false` otherwise.
-    pub async fn cancel_order(&self, order_id: u64) -> bool {
+    pub async fn cancel_order(&self, cancel_order_ids: Vec<u64>) -> bool {
         // --- 1. Scan Bids and Asks for Order ID to get the array index ---
         // This array index is needed for removal and to check the top index vector.
-
+        let order_id = *cancel_order_ids.get(0).unwrap(); //support one for now
         let mut order_array_index: Option<(OrderIndex, bool)> = None; // (index, is_buy)
 
         // Acquire read locks on bids and asks

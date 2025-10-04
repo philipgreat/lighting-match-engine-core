@@ -6,6 +6,7 @@ use tokio::sync::RwLock;
 
 pub const MSG_ORDER_SUBMIT: u8 = 1; // Client -> Engine: Order submission
 pub const MSG_ORDER_CANCEL: u8 = 2; // Client -> Engine: Order cancellation
+
 pub const MSG_TRADE_BROADCAST: u8 = 10; // Engine -> Client: Trade broadcast
 pub const MSG_STATUS_BROADCAST: u8 = 11; // Engine -> Client: Status broadcast
 
@@ -37,9 +38,8 @@ pub struct Order {
 // Order Cancellation Structure (for MSG_ORDER_CANCEL)
 #[derive(Debug, Clone)]
 pub struct CancelOrder {
-    pub product_id: u16, // Product identifier (2 bytes)
-    pub order_id: u64,   // Order ID to cancel (8 bytes)
-                         // Total Payload Size: 10 bytes
+    pub product_id: u16,     // Product identifier (2 bytes)
+    pub order_ids: Vec<u64>, // 实际长度 = count * 8 bytes
 }
 
 // Broadcast Status Structure (for MSG_STATUS_BROADCAST)
@@ -73,15 +73,12 @@ pub struct MatchResult {
 pub enum IncomingMessage {
     Order(Order),
     Cancel(CancelOrder),
+    //CancelBatch(CancelOrderBatch),
 }
 
 // Type alias for indexing into the main orders Vec.
 // u32 is used to maximize CPU cache density for indexing, covering up to 4.2 billion orders.
 pub type OrderIndex = u32;
-
-pub trait ResultSender: Send + Sync {
-    fn send_result(&self, result: MatchResult);
-}
 
 #[derive(Debug)]
 // The core Order Book structure (T in Vec<T>)
