@@ -173,7 +173,7 @@ impl OrderBook {
         //     self.bids.read().await.len(),
         //     self.asks.read().await.len()
         // );
-        let start_time = current_timestamp();
+
         if new_order.order_type == ORDER_TYPE_SELL {
             // New order is a SELL, match against Bids (BUY side)
             matched_orders.extend(
@@ -181,7 +181,6 @@ impl OrderBook {
                     &mut new_order,
                     false, // match against BUY side
                     sender,
-                    start_time,
                 )
                 .await,
             );
@@ -192,7 +191,6 @@ impl OrderBook {
                     &mut new_order,
                     true, // match against SELL side
                     sender,
-                    start_time,
                 )
                 .await,
             );
@@ -214,10 +212,9 @@ impl OrderBook {
         new_order: &mut Order,
         match_against_asks: bool,
         sender: &T,
-        start_time: u64,
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
-
+        let start_time = current_timestamp();
         loop {
             // Break condition: new order is fully filled.
             if new_order.quantity == 0 {
