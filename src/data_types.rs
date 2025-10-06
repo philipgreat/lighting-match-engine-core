@@ -85,6 +85,7 @@ pub type OrderIndex = u32;
 // This implements the layered indexing (Price-Time Priority).
 
 pub struct OrderBook {
+    pub instance_tag: [u8; 8], // 8-byte engine instance tag
     // Vectors to hold the actual orders. Bids: best to worst. Asks: best to worst.
     pub bids: RwLock<Vec<Order>>,
     pub asks: RwLock<Vec<Order>>,

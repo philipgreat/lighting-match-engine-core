@@ -47,8 +47,9 @@ pub trait ResultSender: Send + Sync {
 
 impl OrderBook {
     /// Constructs a new OrderBook with specified initial capacities.
-    pub fn new(initial_book_size: u32, initial_top_size: u32) -> Self {
+    pub fn new(instance_tag: [u8; 8], initial_book_size: u32, initial_top_size: u32) -> Self {
         OrderBook {
+            instance_tag: instance_tag,
             bids: RwLock::new(Vec::with_capacity(initial_book_size as usize)),
             asks: RwLock::new(Vec::with_capacity(initial_book_size as usize)),
 
@@ -313,8 +314,7 @@ impl OrderBook {
             let end_time = start_time + (time_lapsed as u64);
 
             let match_result = MatchResult {
-                // ... (fields populated) ...
-                instance_tag: [0; 8],
+                instance_tag: self.instance_tag,
                 product_id: new_order.product_id,
                 buy_order_id: buy_id,
                 sell_order_id: sell_id,

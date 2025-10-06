@@ -78,7 +78,7 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
-            "--name" => {
+            "--tag" => {
                 if i + 1 < args.len() {
                     instance_name = Some(args[i + 1].clone());
                     i += 1;
