@@ -207,7 +207,19 @@ impl OrderBook {
         //println!("get a new matched_orders {:?}", matched_orders.clone());
         matched_orders
     }
-
+    fn safe_duration_u32(end_time: u64, submit_time: u64) -> u32 {
+        // 计算差值（防止溢出）
+        if end_time < submit_time {
+            return 0;
+        }
+        let max_allowed = u32::MAX;
+        let diff = end_time - submit_time;
+        if diff > max_allowed as u64 {
+            0
+        } else {
+            diff as u32
+        }
+    }
     /// Internal function to match a new order against one side (Bids or Asks). (async)
     async fn match_against_side<T: ResultSender>(
         &self,
@@ -320,7 +332,7 @@ impl OrderBook {
                 sell_order_id: sell_id,
                 price: trade_price,
                 quantity: trade_quantity,
-                trade_time_network: (end_time - new_order.submit_time) as u32,
+                trade_time_network: Self::safe_duration_u32(end_time, new_order.submit_time),
                 internal_match_time: (time_lapsed) as u32,
             };
 
