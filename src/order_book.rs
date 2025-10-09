@@ -4,8 +4,9 @@ use tokio::sync::RwLock;
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
-    MatchResult, MockMatchResult, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY,
-    ORDER_TYPE_MOCK_SELL, ORDER_TYPE_SELL, Order, OrderBook, OrderIndex,
+    MATCH_RESULT_TYPE_MOCK, MATCH_RESULT_TYPE_REAL, MatchResult, ORDER_PRICE_TYPE_LIMIT,
+    ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_MOCK_SELL, ORDER_TYPE_SELL, Order,
+    OrderBook, OrderIndex,
 };
 
 // --- Helper Structs and Trait ---
@@ -342,6 +343,7 @@ impl OrderBook {
                 quantity: trade_quantity,
                 trade_time_network: Self::safe_duration_u32(end_time, new_order.submit_time),
                 internal_match_time: (time_lapsed) as u32,
+                result_type: MATCH_RESULT_TYPE_REAL,
             };
 
             sender.send_result(match_result).await;
@@ -588,6 +590,7 @@ impl OrderBook {
                 quantity: trade_quantity,
                 trade_time_network: Self::safe_duration_u32(end_time, new_order.submit_time),
                 internal_match_time: (time_lapsed) as u32,
+                result_type: MATCH_RESULT_TYPE_MOCK,
             };
 
             // Send the mock trade signal

@@ -84,7 +84,7 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
                     i += 1;
                 }
             }
-            "--prodid" => {
+            "--prod-id" => {
                 if i + 1 < args.len() {
                     product_id = Some(args[i + 1].clone());
                     i += 1;
@@ -127,7 +127,7 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
 
     // 2. Product ID
     let prod_id_str = product_id.ok_or_else(|| {
-        "Missing required argument: --prodid. Also check env var PROD_ID.".to_string()
+        "Missing required argument: --prod-id. Also check env var PROD_ID.".to_string()
     })?;
     let prod_id: u16 = prod_id_str.parse().map_err(|_| {
         format!(
@@ -188,7 +188,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => {
             eprintln!("Configuration Error: {}", e);
             eprintln!(
-                "Usage: --name <tag_8_chars_max> --prodid <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]"
+                "Usage: --name <tag_8_chars_max> --prod-id <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]"
             );
             return Err(e.into());
         }

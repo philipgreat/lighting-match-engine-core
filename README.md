@@ -38,7 +38,7 @@ Get up and running in minutes!
 1.  **Start the Engine:**
 
     ```bash
-    cargo run -- --prodid 7 --tag FIX009 --test-order-book-size 10k
+    cargo run -- --prod-id 7 --tag FIX009 --test-order-book-size 10k
     ```
 
     This command starts an engine instance for product `7` with the tag `FIX009` and a test order book of 10,000 buy and sell orders.
