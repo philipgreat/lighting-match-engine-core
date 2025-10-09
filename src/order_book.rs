@@ -1,11 +1,11 @@
-use crate::date_time_tool::current_timestamp;
 use crate::high_resolution_timer::HighResultionCounter;
+use crate::{data_types::ORDER_TYPE_MOCK_BUY, date_time_tool::current_timestamp};
 use tokio::sync::RwLock;
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
-    MatchResult, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_SELL,
-    Order, OrderBook, OrderIndex,
+    MatchResult, MockMatchResult, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY,
+    ORDER_TYPE_MOCK_SELL, ORDER_TYPE_SELL, Order, OrderBook, OrderIndex,
 };
 
 // --- Helper Structs and Trait ---
@@ -161,6 +161,19 @@ impl OrderBook {
 
     // --- Phase 3: Match Orders ---
 
+    pub async fn process_order<T: ResultSender>(
+        &self,
+        new_order: Order,
+        sender: &T,
+    ) -> Vec<MatchedRestingOrder> {
+        if new_order.order_type == ORDER_TYPE_BUY || new_order.order_type == ORDER_TYPE_SELL {
+            return self.match_order(new_order, sender).await;
+        }
+
+        let (_, matched_orders) = self.mock_match_order(new_order, sender).await;
+        matched_orders
+    }
+
     /// Primary entry point for matching a new incoming order (aggressor). (async)
     pub async fn match_order<T: ResultSender>(
         &self,
@@ -176,27 +189,22 @@ impl OrderBook {
         //     self.asks.read().await.len()
         // );
 
-        if new_order.order_type == ORDER_TYPE_SELL {
-            // New order is a SELL, match against Bids (BUY side)
-            matched_orders.extend(
-                self.match_against_side(
-                    &mut new_order,
-                    false, // match against BUY side
-                    sender,
-                )
-                .await,
-            );
-        } else if new_order.order_type == ORDER_TYPE_BUY {
-            // New order is a BUY, match against Asks (SELL side)
-            matched_orders.extend(
-                self.match_against_side(
-                    &mut new_order,
-                    true, // match against SELL side
-                    sender,
-                )
-                .await,
-            );
-        }
+        let match_sell_side = match new_order.order_type {
+            ORDER_TYPE_BUY => true,
+            ORDER_TYPE_MOCK_BUY => true,
+            ORDER_TYPE_SELL => false,
+            ORDER_TYPE_MOCK_SELL => false,
+            _ => false, // 或处理未知类型
+        };
+
+        matched_orders.extend(
+            self.match_against_side(
+                &mut new_order,
+                match_sell_side, // 使用计算出的标志
+                sender,
+            )
+            .await,
+        );
 
         // Handle the residual new order for LIMIT types
         if new_order.quantity > 0 && new_order.price_type == ORDER_PRICE_TYPE_LIMIT {
@@ -358,8 +366,8 @@ impl OrderBook {
             // Loop continues to check if more orders can be matched.
         }
         let result = matched_orders.clone();
-        self.post_match(matched_orders).await;
-        result
+        self.post_match(result).await;
+        matched_orders
     }
 
     // --- Phase 4: Post Match Processing ---
@@ -498,5 +506,151 @@ impl OrderBook {
         self.prepare_index().await;
 
         true // Order was successfully canceled
+    }
+
+    // support mock
+    async fn mock_match_against_side<T: ResultSender>(
+        new_order: &mut Order,
+        match_against_asks: bool,
+        sender: &T,
+        // The large order list is passed as an immutable slice/reference (no clone cost)
+        resting_orders: &[Order],
+        // The index list is passed as a mutable reference to the local clone (allows modification)
+        top_index: &mut Vec<OrderIndex>,
+        instance_tag: [u8; 8],
+    ) -> Vec<MatchedRestingOrder> {
+        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
+        let start_time = current_timestamp();
+        let timer = HighResultionCounter::start(3.0);
+
+        loop {
+            // Stop conditions: aggressor filled or no more top resting orders.
+            if new_order.quantity == 0 || top_index.is_empty() {
+                break;
+            }
+
+            let resting_order_index_in_vector = top_index[0];
+
+            // Access the resting order using the immutable reference to the large data set.
+            let resting_order = match resting_orders.get(resting_order_index_in_vector as usize) {
+                Some(order) => order,
+                None => {
+                    top_index.remove(0);
+                    continue;
+                }
+            };
+
+            // --- Price Check ---
+            let price_check_ok = if match_against_asks {
+                // New BUY vs ASK: New price must be >= resting price (or Market)
+                new_order.price_type == ORDER_PRICE_TYPE_MARKET
+                    || new_order.price >= resting_order.price
+            } else {
+                // New SELL vs BID: New price must be <= resting price (or Market)
+                new_order.price_type == ORDER_PRICE_TYPE_MARKET
+                    || new_order.price <= resting_order.price
+            };
+
+            if !price_check_ok {
+                break; // Price not aggressive enough.
+            }
+
+            // --- Match Calculation ---
+            let trade_quantity = new_order.quantity.min(resting_order.quantity);
+            let trade_price = resting_order.price;
+
+            new_order.quantity -= trade_quantity;
+
+            matched_orders.push(MatchedRestingOrder {
+                order_index: resting_order_index_in_vector,
+                matched_quantity: trade_quantity,
+                is_buy: !match_against_asks,
+            });
+
+            // Determine Buy/Sell IDs for the trade result
+            let (buy_id, sell_id) = if !match_against_asks {
+                // Matching BIDS (BUY side) -> Resting order is BUY
+                (resting_order.order_id, new_order.order_id)
+            } else {
+                // Matching ASKS (SELL side) -> Resting order is SELL
+                (new_order.order_id, resting_order.order_id)
+            };
+
+            let time_lapsed = timer.ns();
+            let end_time = start_time + (time_lapsed as u64);
+
+            let mock_result = MatchResult {
+                instance_tag: instance_tag,
+                product_id: new_order.product_id,
+                buy_order_id: buy_id,
+                sell_order_id: sell_id,
+                price: trade_price,
+                quantity: trade_quantity,
+                trade_time_network: Self::safe_duration_u32(end_time, new_order.submit_time),
+                internal_match_time: (time_lapsed) as u32,
+            };
+
+            // Send the mock trade signal
+            sender.send_result(mock_result).await;
+
+            // Consume the top index from the local clone
+            top_index.remove(0);
+        }
+        matched_orders
+    }
+    // ----------------------------------------------------------------------
+
+    /// Simulates order matching against the current order book state.
+    /// It reads from the OrderBook's vectors but modifies local copies of the top indices.
+    /// This ensures the OrderBook's state remains unchanged (pure read operation).
+    pub async fn mock_match_order<T: ResultSender>(
+        &self,
+        mut new_order: Order,
+        sender: &T,
+    ) -> (Order, Vec<MatchedRestingOrder>) {
+        let match_against_asks = match new_order.order_type {
+            ORDER_TYPE_BUY | ORDER_TYPE_MOCK_BUY => true, // Match against Asks (SELL side)
+            ORDER_TYPE_SELL | ORDER_TYPE_MOCK_SELL => false, // Match against Bids (BUY side)
+            _ => return (new_order, Vec::new()),
+        };
+
+        // --- 1. Acquire Read Locks and Clone Top Index ---
+
+        // Acquire read guards for the side being matched
+        let (resting_orders_guard, top_index_guard) = if match_against_asks {
+            let asks = self.asks.read().await;
+            let top_asks = self.top_asks_index.read().await;
+            (asks, top_asks)
+        } else {
+            let bids = self.bids.read().await;
+            let top_bids = self.top_bids_index.read().await;
+            (bids, top_bids)
+        };
+
+        // Clone the index list to a local mutable variable (cheap, allows mutation)
+        let mut top_index_clone = top_index_guard.clone();
+
+        // Explicitly drop the top index read lock as it's no longer needed after cloning,
+        // but keep the resting_orders_guard to hold the immutable reference.
+        drop(top_index_guard);
+
+        // --- 2. Execute Mock Matching ---
+
+        // Pass the immutable reference of the large order list (&resting_orders_guard)
+        let matched_orders = Self::mock_match_against_side(
+            &mut new_order,
+            match_against_asks,
+            sender,
+            &resting_orders_guard, // Immutable reference to the data within the read guard (avoids clone)
+            &mut top_index_clone,  // Mutable reference to the local clone (allows remove)
+            self.instance_tag,
+        )
+        .await;
+
+        // The resting_orders_guard is automatically dropped here, releasing the read lock.
+
+        // --- 3. Return Mock Results ---
+        // New order (with residual quantity) and matched orders list.
+        (new_order, matched_orders)
     }
 }

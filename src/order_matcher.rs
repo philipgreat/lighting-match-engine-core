@@ -55,7 +55,7 @@ impl OrderMatcher {
         }
 
         let order_book = self.state.order_book.clone();
-        order_book.match_order(new_order, self).await;
+        order_book.process_order(new_order, self).await;
 
         //order_book.match_order(new_order, sender)
         // 1. Pre-matching clean-up: Remove expired orders

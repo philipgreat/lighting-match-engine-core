@@ -12,6 +12,10 @@ pub const MSG_STATUS_BROADCAST: u8 = 11; // Engine -> Client: Status broadcast
 // --- Order Type Constants ---
 pub const ORDER_TYPE_BUY: u8 = 1; // Order side: Buy
 pub const ORDER_TYPE_SELL: u8 = 2; // Order side: Sell
+
+pub const ORDER_TYPE_MOCK_BUY: u8 = 3; // Order side: Sell
+pub const ORDER_TYPE_MOCK_SELL: u8 = 4; // Order side: Sell
+
 pub const ORDER_PRICE_TYPE_LIMIT: u8 = 1; // Order price type: Limit
 pub const ORDER_PRICE_TYPE_MARKET: u8 = 2; // Order price type: Market
 
@@ -57,6 +61,17 @@ pub struct BroadcastStats {
 // Match Result Structure (for MSG_TRADE_BROADCAST)
 #[derive(Debug, Clone)]
 pub struct MatchResult {
+    pub instance_tag: [u8; 8],    // 8-byte engine instance tag
+    pub product_id: u16,          // Product identifier (2 bytes)
+    pub buy_order_id: u64,        // Buyer's order ID (8 bytes)
+    pub sell_order_id: u64,       // Seller's order ID (8 bytes)
+    pub price: u64,               // Trade price (8 bytes)
+    pub quantity: u32,            // Trade quantity (4 bytes)
+    pub trade_time_network: u32,  // Trade timestamp (Nanoseconds) (4 bytes)
+    pub internal_match_time: u32, // Total Payload Size: 46 bytes
+}
+#[derive(Debug, Clone)]
+pub struct MockMatchResult {
     pub instance_tag: [u8; 8],    // 8-byte engine instance tag
     pub product_id: u16,          // Product identifier (2 bytes)
     pub buy_order_id: u64,        // Buyer's order ID (8 bytes)
