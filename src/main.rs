@@ -15,7 +15,7 @@ mod number_tool;
 mod order_book;
 mod order_matcher;
 mod test_order_book_builder;
-use broadcast_handler::trade_network_time;
+use broadcast_handler::BroadcastHandler;
 use data_types::{EngineState, IncomingMessage, MatchResult};
 
 use network_handler::NetworkHandler;
@@ -246,7 +246,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         engine_state.clone(),
     );
     let mut order_matcher = OrderMatcher::new(message_rx, match_tx, engine_state.clone());
-    let mut broadcast_handler = trade_network_time::new(
+    let mut broadcast_handler = BroadcastHandler::new(
         shared_broadcast_socket.clone(),
         engine_state.status_multicast_addr,
         match_rx,

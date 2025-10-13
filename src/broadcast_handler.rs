@@ -8,20 +8,20 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 /// Handler responsible for sending out matched trade results.
-pub struct trade_network_time {
+pub struct BroadcastHandler {
     socket: Arc<UdpSocket>,
     trade_multicast_addr: SocketAddr,
     receiver: Receiver<MatchResult>,
 }
 
-impl trade_network_time {
-    /// Creates a new trade_network_time.
+impl BroadcastHandler {
+    /// Creates a new broadcast_handler.
     pub fn new(
         socket: Arc<UdpSocket>,
         trade_multicast_addr: SocketAddr,
         receiver: Receiver<MatchResult>,
     ) -> Self {
-        trade_network_time {
+        BroadcastHandler {
             socket,
             trade_multicast_addr,
             receiver,
