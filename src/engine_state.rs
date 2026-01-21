@@ -19,7 +19,7 @@ impl EngineState {
         EngineState {
             instance_tag,
             product_id,
-            order_book: Arc::new(RwLock::new(OrderBook::new(10000, 10))),
+            order_book: Arc::new(RwLock::new(OrderBook::new(10000, 10000))),
             matched_orders: Arc::new(RwLock::new(0)),
             total_received_orders: Arc::new(RwLock::new(0)),
             start_time: now_nanos,

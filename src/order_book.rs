@@ -232,7 +232,7 @@ impl OrderBook {
 
             // Check if there are any indexed orders left
             if top_index.is_empty() {
-                println!("top_index_guard.is_empty()");
+                //println!("top_index_guard.is_empty()");
                 // Try to refill the index if it is empty
                
                 // Re-index:
