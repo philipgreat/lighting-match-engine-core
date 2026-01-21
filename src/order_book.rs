@@ -208,9 +208,9 @@ impl OrderBook {
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
         let start_time = current_timestamp();
-        let timer = HighResultionCounter::start(3.0);
+        
         loop {
-
+            let timer = HighResultionCounter::start(3.0);
             //println!("info: matched order size {}", matched_orders.len());
 
             // Break condition: new order is fully filled.
@@ -328,30 +328,13 @@ impl OrderBook {
 
             // Remove the first index (the index of the matched order)
             if !top_index.is_empty() {
+                //to awoid this step, increase the top index size
                 top_index.remove(0);
                 self.post_match(matched_orders.clone());
-                matched_orders = Vec::with_capacity(20)
+                matched_orders.clear();
+                
             }
-            
-            
-            // drop(top_index_write_guard);
-
-
-            // let top_index_guard1 = if match_against_asks {
-            //     self.top_asks_index.read().await
-            // } else {
-            //     self.top_bids_index.read().await
-            // };
-
-            // if top_index_guard1.is_empty() {
-            //         println!("cleared, execute post match");
-            //         self.post_match(matched_orders.clone()).await;                    
-            //         matched_orders = Vec::new() ;
-            // }
-            // drop(top_index_guard1);
-
-
-
+ 
             // Loop continues to check if more orders can be matched.
         }
         let result = matched_orders.clone();
