@@ -189,7 +189,7 @@ impl OrderBook {
         mut new_order: Order,
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
-        println!("entering match_order");
+        //println!("entering match_order");
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
 
         if new_order.order_type == ORDER_TYPE_SELL {
