@@ -7,7 +7,7 @@ use crate::data_types::{
 /// The buffer must be at least 2 bytes long.
 fn calculate_checksum(buf: &[u8]) -> u8 {
     // Checksum is calculated over the payload (index 2 onwards)
-    buf[2..].iter().fold(0, |acc, &x| acc ^ x)
+    buf[1..].iter().fold(0, |acc, &x| acc ^ x)
 }
 
 /// Serializes an Order struct into a 50-byte network buffer.
