@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 impl EngineState {
     /// Creates a new EngineState instance with initialized components.
-    pub fn new(instance_tag: [u8; 8], product_id: u16, status_multicast_addr: SocketAddr) -> Self {
+    pub fn new(instance_tag: [u8; 16], product_id: u16, status_multicast_addr: SocketAddr) -> Self {
         let now_nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("fail")

@@ -66,7 +66,7 @@ pub fn serialize_match_result(result: &MatchResult) -> [u8; MESSAGE_TOTAL_SIZE] 
     buf[1] = MSG_TRADE_BROADCAST;
 
     // Instance Tag ([u8; 8])
-    buf[payload_start..payload_start + 8].copy_from_slice(&result.instance_tag);
+    buf[payload_start..payload_start + 16].copy_from_slice(&result.instance_tag);
     // Product ID (u16)
     buf[payload_start + 8..payload_start + 10].copy_from_slice(&result.product_id.to_be_bytes());
     // Buy Order ID (u64)
@@ -105,32 +105,32 @@ pub fn serialize_stats_result(stats: &BroadcastStats) -> [u8; MESSAGE_TOTAL_SIZE
     // --- Payload Serialization (Total 30 bytes) ---
 
     // 1. Instance Tag ([u8; 8])
-    // Size: 8 bytes
-    buf[current_idx..current_idx + 8].copy_from_slice(&stats.instance_tag);
-    current_idx += 8; // Index: 10
+    // Size: 16 bytes
+    buf[current_idx..current_idx + 16].copy_from_slice(&stats.instance_tag);
+    current_idx += 16; // Index: 18
 
     // 2. Product ID (u16)
     // Size: 2 bytes
     buf[current_idx..current_idx + 2].copy_from_slice(&stats.product_id.to_be_bytes());
-    current_idx += 2; // Index: 12
+    current_idx += 2; // Index: 20
 
     // 3. Order Book Size (u32)
     // Size: 4 bytes (FIXED from u64)
     buf[current_idx..current_idx + 4].copy_from_slice(&stats.bids_size.to_be_bytes());
-    current_idx += 4; // Index: 16
+    current_idx += 4; // Index: 24
 
     buf[current_idx..current_idx + 4].copy_from_slice(&stats.ask_size.to_be_bytes());
-    current_idx += 4; // Index: 16
+    current_idx += 4; // Index: 28
 
     // 4. Matched Orders (u32)
     // Size: 4 bytes (FIXED from u64)
     buf[current_idx..current_idx + 4].copy_from_slice(&stats.matched_orders.to_be_bytes());
-    current_idx += 4; // Index: 20
+    current_idx += 4; // Index: 32
 
     // 5. Total Received Orders (u32)
     // Size: 4 bytes (FIXED from u64)
     buf[current_idx..current_idx + 4].copy_from_slice(&stats.total_received_orders.to_be_bytes());
-    current_idx += 4; // Index: 24
+    current_idx += 4; // Index: 36
 
     // 6. Start Time (u64)
     // Size: 8 bytes

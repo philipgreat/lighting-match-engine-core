@@ -321,7 +321,8 @@ impl OrderBook {
             };
 
             if !price_check_ok {
-                //println!("!price_check_ok {:?}", resting_order);
+                println!("!price_check_ok incoming  order {:?} and resting order {:?}", 
+                new_order,resting_order);
                 break; // Price not aggressive enough. Stop matching.
             }
 
@@ -355,7 +356,7 @@ impl OrderBook {
             };
             let match_result = MatchResult {
                 // ... (fields populated) ...
-                instance_tag: [0; 8],
+                instance_tag: [0; 16],
                 product_id: new_order.product_id,
                 buy_order_id: buy_id,
                 sell_order_id: sell_id,

@@ -85,6 +85,12 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
                     i += 1;
                 }
             }
+            "--tag" => {
+                if i + 1 < args.len() {
+                    instance_name = Some(args[i + 1].clone());
+                    i += 1;
+                }
+            }
             "--prodid" => {
                 if i + 1 < args.len() {
                     product_id = Some(args[i + 1].clone());
@@ -119,9 +125,9 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
         .or_else(|| std::env::var("INST_NAME").ok())
         .unwrap_or_else(|| "DEFAULT".to_string());
 
-    if tag_string.len() > 8 {
+    if tag_string.len() > 16 {
         return Err(format!(
-            "Instance tag '{}' exceeds maximum length of 8 characters.",
+            "Instance tag '{}' exceeds maximum length of 16 characters.",
             tag_string
         ));
     }
@@ -171,10 +177,10 @@ fn get_config() -> Result<(String, u16, std::net::SocketAddr, std::net::SocketAd
     ))
 }
 
-fn tag_to_u8_array(tag: &str) -> [u8; 8] {
-    let mut tag_array = [0u8; 8];
+fn tag_to_u16_array(tag: &str) -> [u8; 16] {
+    let mut tag_array = [0u8; 16];
     let bytes = tag.as_bytes();
-    let len = std::cmp::min(bytes.len(), 8);
+    let len = std::cmp::min(bytes.len(), 16);
     tag_array[..len].copy_from_slice(&bytes[..len]);
     tag_array
 }
@@ -195,7 +201,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let instance_tag_bytes = tag_to_u8_array(&tag_string);
+    let instance_tag_bytes = tag_to_u16_array(&tag_string);
 
     println!("Configuration Loaded:");
     println!("  Instance Tag: {}", tag_string);

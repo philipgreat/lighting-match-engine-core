@@ -52,7 +52,7 @@ pub struct CancelOrder {
 // Broadcast Status Structure (for MSG_STATUS_BROADCAST)
 #[derive(Debug, Clone)]
 pub struct BroadcastStats {
-    pub instance_tag: [u8; 8],      // 8-byte engine instance tag
+    pub instance_tag: [u8; 16],      // 8-byte engine instance tag
     pub product_id: u16,            // Product identifier (2 bytes)
     pub bids_size: u32,             // Current order book size (4 bytes)
     pub ask_size: u32,              // Current order book size (4 bytes)
@@ -65,7 +65,7 @@ pub struct BroadcastStats {
 // Match Result Structure (for MSG_TRADE_BROADCAST)
 #[derive(Debug, Clone)]
 pub struct MatchResult {
-    pub instance_tag: [u8; 8],    // 8-byte engine instance tag
+    pub instance_tag: [u8; 16],    // 8-byte engine instance tag
     pub product_id: u16,          // Product identifier (2 bytes)
     pub buy_order_id: u64,        // Buyer's order ID (8 bytes)
     pub sell_order_id: u64,       // Seller's order ID (8 bytes)
@@ -115,7 +115,7 @@ pub struct OrderBook {
 // Engine State and Context
 #[derive(Debug)]
 pub struct EngineState {
-    pub instance_tag: [u8; 8],
+    pub instance_tag: [u8; 16],
     pub product_id: u16,
     // Order Book
     pub order_book: Arc<RwLock<OrderBook>>,
