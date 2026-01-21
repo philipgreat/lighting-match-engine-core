@@ -27,7 +27,7 @@ It's a focused, no-frills engine that you can build upon. Each instance serves a
 *   **Order Types:** Market and Limit orders.
 *   **Matching Policies:** Price-first, time-first.
 *   **High Precision:** Time is measured in nanoseconds.
-*   **Lean & Mean:** 50-byte package size for efficient network communication.
+*   **Lean & Mean:** 64-byte package size for efficient network communication.
 *   **In-Memory Processing:** All operations happen in memory for maximum speed.
 *   **UDP Multicast:** Orders are received via UDP multicast for low-latency communication.
 
