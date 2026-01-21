@@ -174,11 +174,11 @@ pub fn deserialize_order(payload: &[u8]) -> Result<Order, &'static str> {
     let order_id = u64::from_be_bytes(payload[2..10].try_into().unwrap());
     let price = u64::from_be_bytes(payload[10..18].try_into().unwrap());
     let quantity = u32::from_be_bytes(payload[18..22].try_into().unwrap());
-    let order_type = payload[22];
+    let order_type = payload[22].checked_sub(2).unwrap_or(payload[22]);
     let price_type = payload[23];
     let submit_time = u64::from_be_bytes(payload[24..32].try_into().unwrap());
     let expire_time = u64::from_be_bytes(payload[32..40].try_into().unwrap());
-
+    let is_mocked_order=payload[22]>2; 
     Ok(Order {
         product_id,
         order_id,
@@ -188,6 +188,8 @@ pub fn deserialize_order(payload: &[u8]) -> Result<Order, &'static str> {
         price_type,
         submit_time,
         expire_time,
+        is_mocked_order,
+        
     })
 }
 

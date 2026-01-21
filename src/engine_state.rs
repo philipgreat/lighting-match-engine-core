@@ -3,7 +3,7 @@ use crate::message_codec;
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
-
+use tokio::sync::Mutex;
 use crate::data_types::OrderBook;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ impl EngineState {
         EngineState {
             instance_tag,
             product_id,
-            order_book: Arc::new(OrderBook::new(10000, 10000)),
+            order_book: Arc::new(RwLock::new(OrderBook::new(10000, 10))),
             matched_orders: Arc::new(RwLock::new(0)),
             total_received_orders: Arc::new(RwLock::new(0)),
             start_time: now_nanos,
@@ -68,8 +68,8 @@ impl StatusBroadcaster {
             let stats = BroadcastStats {
                 instance_tag: self.state.instance_tag,
                 product_id: self.state.product_id,
-                bids_size: order_book.bids.read().await.len() as u32,
-                ask_size: order_book.asks.read().await.len() as u32,
+                bids_size: order_book.read().await.bids.len() as u32,
+                ask_size: order_book.read().await.asks.len() as u32,
                 matched_orders: *matched_orders as u32,
                 total_received_orders: *total_received_orders as u32,
                 start_time: self.state.start_time,

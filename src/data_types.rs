@@ -1,6 +1,5 @@
 // --- Message Type Constants ---
-use std::collections::BTreeMap;
-use std::collections::VecDeque;
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -12,11 +11,17 @@ pub const MSG_STATUS_BROADCAST: u8 = 11; // Engine -> Client: Status broadcast
 // --- Order Type Constants ---
 pub const ORDER_TYPE_BUY: u8 = 1; // Order side: Buy
 pub const ORDER_TYPE_SELL: u8 = 2; // Order side: Sell
+
+pub const ORDER_TYPE_MOCK_BUY: u8 = 3; // Order side: mock buy
+pub const ORDER_TYPE_MOCK_SELL: u8 = 4; // Order side: mock sell
+
+
+
 pub const ORDER_PRICE_TYPE_LIMIT: u8 = 1; // Order price type: Limit
 pub const ORDER_PRICE_TYPE_MARKET: u8 = 2; // Order price type: Market
 
 // --- Message Size Constant ---
-pub const MESSAGE_TOTAL_SIZE: usize = 50; // All network packets are 50 bytes fixed size.
+pub const MESSAGE_TOTAL_SIZE: usize = 64; // All network packets are 64 bytes fixed size.
 
 // --- Data Structure Definitions ---
 
@@ -27,11 +32,12 @@ pub struct Order {
     pub order_id: u64,    // Unique order ID (8 bytes)
     pub price: u64,       // Price (8 bytes)
     pub quantity: u32,    // Quantity (4 bytes)
-    pub order_type: u8,   // Order side (BUY/SELL) (1 byte)
+    pub order_type: u8,   // Order side (BUY/SELL/MOCK_BUY/MOCK_SELL/) (1 byte)
     pub price_type: u8,   // Price type (LIMIT/MARKET) (1 byte)
     pub submit_time: u64, // Submission timestamp (Nanoseconds) (8 bytes)
     pub expire_time: u64, // Expiration timestamp (Nanoseconds. 0 means GTC) (8 bytes)
                           // Total Payload Size: 40 bytes
+    pub is_mocked_order: bool, 
 }
 
 // Order Cancellation Structure (for MSG_ORDER_CANCEL)
@@ -40,6 +46,7 @@ pub struct CancelOrder {
     pub product_id: u16, // Product identifier (2 bytes)
     pub order_id: u64,   // Order ID to cancel (8 bytes)
                          // Total Payload Size: 10 bytes
+    
 }
 
 // Broadcast Status Structure (for MSG_STATUS_BROADCAST)
@@ -89,12 +96,12 @@ pub trait ResultSender: Send + Sync {
 
 pub struct OrderBook {
     // Vectors to hold the actual orders. Bids: best to worst. Asks: best to worst.
-    pub bids: RwLock<Vec<Order>>,
-    pub asks: RwLock<Vec<Order>>,
+    pub bids: Vec<Order>,
+    pub asks: Vec<Order>,
 
     // Vectors to hold the indices of the best orders.
-    pub top_bids_index: RwLock<Vec<OrderIndex>>,
-    pub top_asks_index: RwLock<Vec<OrderIndex>>,
+    pub top_bids_index: Vec<OrderIndex>,
+    pub top_asks_index: Vec<OrderIndex>,
 
     // Configuration
     pub init_order_book_size: u32,
@@ -107,7 +114,7 @@ pub struct EngineState {
     pub instance_tag: [u8; 8],
     pub product_id: u16,
     // Order Book
-    pub order_book: Arc<OrderBook>,
+    pub order_book: Arc<RwLock<OrderBook>>,
     // Counters
     pub matched_orders: std::sync::Arc<RwLock<u64>>,
     pub total_received_orders: std::sync::Arc<RwLock<u64>>,

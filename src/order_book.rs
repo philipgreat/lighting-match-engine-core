@@ -49,11 +49,11 @@ impl OrderBook {
     /// Constructs a new OrderBook with specified initial capacities.
     pub fn new(initial_book_size: u32, initial_top_size: u32) -> Self {
         OrderBook {
-            bids: RwLock::new(Vec::with_capacity(initial_book_size as usize)),
-            asks: RwLock::new(Vec::with_capacity(initial_book_size as usize)),
+            bids: Vec::with_capacity(initial_book_size as usize),
+            asks: Vec::with_capacity(initial_book_size as usize),
 
-            top_bids_index: RwLock::new(Vec::with_capacity(initial_top_size as usize)),
-            top_asks_index: RwLock::new(Vec::with_capacity(initial_top_size as usize)),
+            top_bids_index: Vec::with_capacity(initial_top_size as usize),
+            top_asks_index: Vec::with_capacity(initial_top_size as usize),
 
             init_order_book_size: initial_book_size,
             init_top_index_size: initial_top_size,
@@ -63,17 +63,15 @@ impl OrderBook {
     // --- Phase 1: Fuel Order (Adding orders) ---
 
     /// Adds an order to the order book (bids or asks).
-    pub async fn fuel_order(&self, order: Order) {
+    pub async fn fuel_order(&mut self, order: Order) {
         if order.order_type == ORDER_TYPE_BUY {
             // Acquire a write lock asynchronously
-            let mut bids = self.bids.write().await;
             // In a real system, insert the order while maintaining price/time priority.
-            bids.push(order);
+            self.bids.push(order);
         } else if order.order_type == ORDER_TYPE_SELL {
             // Acquire a write lock asynchronously
-            let mut asks = self.asks.write().await;
             // In a real system, insert the order while maintaining price/time priority.
-            asks.push(order);
+            self.asks.push(order);
         }
     }
 
@@ -83,12 +81,12 @@ impl OrderBook {
     // --- Phase 2: Index Preparation ---
 
     /// Finds and stores the indices of the best bid orders based on Price (desc) then Time (asc). (async)
-    async fn prepare_bids_index(&self) {
+    fn prepare_bids_index(&mut self) {
         // 1. Acquire read lock for bids
-        let bids_guard = self.bids.read().await;
+        
 
         // 2. Create a list of (index, price, submit_time) for sorting
-        let mut indexed_bids: Vec<(OrderIndex, u64, u64)> = bids_guard
+        let mut indexed_bids: Vec<(OrderIndex, u64, u64)> = self.bids
             .iter()
             .enumerate()
             // Map the order to its index, price, and submission time
@@ -105,25 +103,25 @@ impl OrderBook {
         });
 
         // 4. Acquire write lock for top_bids_index
-        let mut top_bids_index_guard = self.top_bids_index.write().await;
-        top_bids_index_guard.clear();
+        //let mut top_bids_index_guard = self.top_bids_index.write().await;
+        self.top_bids_index.clear();
 
         // 5. Take the first N indices (top orders)
         let max_size = self.init_top_index_size as usize;
         for (index, _, _) in indexed_bids.into_iter().take(max_size) {
-            top_bids_index_guard.push(index);
+            self.top_bids_index.push(index);
         }
 
         // Lock guards are dropped here automatically.
     }
 
     /// Finds and stores the indices of the best ask orders based on Price (asc) then Time (asc). (async)
-    async fn prepare_asks_index(&self) {
+    fn prepare_asks_index(&mut self) {
         // 1. Acquire read lock for asks
-        let asks_guard = self.asks.read().await;
+       
 
         // 2. Create a list of (index, price, submit_time) for sorting
-        let mut indexed_asks: Vec<(OrderIndex, u64, u64)> = asks_guard
+        let mut indexed_asks: Vec<(OrderIndex, u64, u64)> = self.asks
             .iter()
             .enumerate()
             // Map the order to its index, price, and submission time
@@ -140,40 +138,34 @@ impl OrderBook {
         });
 
         // 4. Acquire write lock for top_asks_index
-        let mut top_asks_index_guard = self.top_asks_index.write().await;
-        top_asks_index_guard.clear();
+        //let mut top_asks_index_guard = self.top_asks_index.write().await;
+        self.top_asks_index.clear();
 
         // 5. Take the first N indices (top orders)
         let max_size = self.init_top_index_size as usize;
         for (index, _, _) in indexed_asks.into_iter().take(max_size) {
-            top_asks_index_guard.push(index);
+             self.top_asks_index.push(index);
         }
 
         // Lock guards are dropped here automatically.
     }
 
     /// Calls both index preparation methods. (async)
-    pub async fn prepare_index(&self) {
-        self.prepare_bids_index().await;
-        self.prepare_asks_index().await;
+    pub  fn prepare_index(&mut self) {
+        self.prepare_bids_index();
+        self.prepare_asks_index();
     }
 
     // --- Phase 3: Match Orders ---
 
     /// Primary entry point for matching a new incoming order (aggressor). (async)
     pub async fn match_order<T: ResultSender>(
-        &self,
+        &mut self,
         mut new_order: Order,
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
-        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
-
-        // println!(
-        //     "get a new order {:?} and bids size {:?} asks size: {:?}",
-        //     new_order.clone(),
-        //     self.bids.read().await.len(),
-        //     self.asks.read().await.len()
-        // );
+        println!("entering match_order");
+        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
 
         if new_order.order_type == ORDER_TYPE_SELL {
             // New order is a SELL, match against Bids (BUY side)
@@ -208,67 +200,74 @@ impl OrderBook {
     }
 
     /// Internal function to match a new order against one side (Bids or Asks). (async)
+    /// 
     async fn match_against_side<T: ResultSender>(
-        &self,
+        &mut self,
         new_order: &mut Order,
         match_against_asks: bool,
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
-        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::new();
+        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
         let start_time = current_timestamp();
         let timer = HighResultionCounter::start(3.0);
         loop {
+
+            //println!("info: matched order size {}", matched_orders.len());
+
             // Break condition: new order is fully filled.
             if new_order.quantity == 0 {
+                println!("new_order.quantity == 0");
                 break;
             }
 
-            // Acquire read locks asynchronously
-            let top_index_guard = if match_against_asks {
-                self.top_asks_index.read().await
+            
+            let  top_index = if match_against_asks {
+                &mut self.top_bids_index
             } else {
-                self.top_bids_index.read().await
-            };
+                &mut self.top_asks_index
+            };  
 
-            let resting_orders_guard = if match_against_asks {
-                self.asks.read().await
-            } else {
-                self.bids.read().await
-            };
+
+
 
             // Check if there are any indexed orders left
-            if top_index_guard.is_empty() {
+            if top_index.is_empty() {
+                println!("top_index_guard.is_empty()");
                 // Try to refill the index if it is empty
-                drop(top_index_guard); // Release read lock to allow write lock for preparation
-
+               
                 // Re-index:
                 if match_against_asks {
-                    self.prepare_asks_index().await
+                    self.prepare_asks_index()
                 } else {
-                    self.prepare_bids_index().await
+                    self.prepare_bids_index()
                 }
 
                 // Re-acquire the lock to check if re-indexing succeeded
-                let re_indexed_guard = if match_against_asks {
-                    self.top_asks_index.read().await
+                let re_indexed= if match_against_asks {
+                    &self.top_asks_index
                 } else {
-                    self.top_bids_index.read().await
+                    &self.top_bids_index
                 };
 
-                if re_indexed_guard.is_empty() {
+                if re_indexed.is_empty() {
                     break; // Still empty, stop matching
                 }
 
                 // Continue loop to use the new index
                 continue;
             }
-
+            let resting_orders= if match_against_asks {
+                &self.asks
+            } else {
+                &self.bids
+            };
             // Get the index of the best resting order (index 0 in the top list)
-            let resting_order_index = top_index_guard[0];
+            let resting_order_index = top_index[0];
 
-            let resting_order = match resting_orders_guard.get(resting_order_index as usize) {
+            let resting_order = match resting_orders.get(resting_order_index as usize) {
                 Some(order) => order,
                 None => {
+                    eprintln!("fatal: no order found for index {} !!!", resting_order_index);
                     break;
                 }
             };
@@ -285,6 +284,7 @@ impl OrderBook {
             };
 
             if !price_check_ok {
+                println!("!price_check_ok");
                 break; // Price not aggressive enough. Stop matching.
             }
 
@@ -326,101 +326,129 @@ impl OrderBook {
 
             sender.send_result(match_result).await;
 
-            // Remove the index of the matched resting order from the top list
-            // NOTE: Must drop read guards before acquiring the write guard for the index list
-            drop(top_index_guard);
-            drop(resting_orders_guard);
-
-            let mut top_index_write_guard = if match_against_asks {
-                self.top_asks_index.write().await
-            } else {
-                self.top_bids_index.write().await
-            };
 
             // Remove the first index (the index of the matched order)
-            if !top_index_write_guard.is_empty() {
-                top_index_write_guard.remove(0);
+            if !top_index.is_empty() {
+                top_index.remove(0);
+                self.post_match(matched_orders.clone());
+                matched_orders = Vec::with_capacity(20)
             }
-            drop(top_index_write_guard);
+            
+            
+            // drop(top_index_write_guard);
+
+
+            // let top_index_guard1 = if match_against_asks {
+            //     self.top_asks_index.read().await
+            // } else {
+            //     self.top_bids_index.read().await
+            // };
+
+            // if top_index_guard1.is_empty() {
+            //         println!("cleared, execute post match");
+            //         self.post_match(matched_orders.clone()).await;                    
+            //         matched_orders = Vec::new() ;
+            // }
+            // drop(top_index_guard1);
+
+
 
             // Loop continues to check if more orders can be matched.
         }
         let result = matched_orders.clone();
-        self.post_match(matched_orders).await;
+        self.post_match(matched_orders);
+        
         result
     }
 
     // --- Phase 4: Post Match Processing ---
 
     /// Cleans up the order book after a match, deleting/updating resting orders, and rebuilding indices. (async)
-    pub async fn post_match(&self, matched_orders: Vec<MatchedRestingOrder>) {
-        let mut bids_to_remove: Vec<OrderIndex> = Vec::new();
-        let mut asks_to_remove: Vec<OrderIndex> = Vec::new();
+    pub  fn post_match(&mut self, matched_orders: Vec<MatchedRestingOrder>) {
+
+        //println!(" orders matched {}", matched_orders.len());
+
+        if matched_orders.is_empty() {
+            println!("no order to execute post match");
+            return;
+        }
+
+        let mut bids_to_remove: Vec<OrderIndex> = Vec::with_capacity(20);
+        let mut asks_to_remove: Vec<OrderIndex> = Vec::with_capacity(20);
 
         // Acquire write locks for both bids and asks vectors
-        let mut bids_guard = self.bids.write().await;
-        let mut asks_guard = self.asks.write().await;
+       
 
         // 1 & 2. Process and mark for removal/update
         for matched in matched_orders {
-            let (orders_vec, to_remove_list) = if matched.is_buy {
-                (&mut bids_guard, &mut bids_to_remove)
-            } else {
-                (&mut asks_guard, &mut asks_to_remove)
-            };
+            if matched.is_buy {
+                // For buy orders, use bids and bids_to_remove
+                let ( orders_vec, to_remove_list) = (&mut self.bids, &mut bids_to_remove);
 
-            if let Some(order) = orders_vec.get_mut(matched.order_index as usize) {
-                if matched.matched_quantity >= order.quantity {
-                    // Mark for removal
-                    to_remove_list.push(matched.order_index);
-                } else {
-                    // Partial fill: update remaining quantity
-                    order.quantity -= matched.matched_quantity;
+                if let Some(order) = orders_vec.get_mut(matched.order_index as usize) {
+                    if matched.matched_quantity >= order.quantity {
+                        // Mark for removal
+                        to_remove_list.push(matched.order_index);
+                    } else {
+                        // Partial fill: update remaining quantity
+                        order.quantity -= matched.matched_quantity;
+                    }
+                }
+            } else {
+                // For sell orders, use asks and asks_to_remove
+                let ( orders_vec, to_remove_list) = (&mut self.asks, &mut asks_to_remove);
+
+                if let Some(order) = orders_vec.get_mut(matched.order_index as usize) {
+                    if matched.matched_quantity >= order.quantity {
+                        // Mark for removal
+                        to_remove_list.push(matched.order_index);
+                    } else {
+                        // Partial fill: update remaining quantity
+                        order.quantity -= matched.matched_quantity;
+                    }
                 }
             }
         }
+
 
         // 2. Remove fully matched orders (must be done in descending index order for safe removal)
 
         // Remove from Bids
         bids_to_remove.sort_by(|a, b| b.cmp(a));
         for index in bids_to_remove {
-            if (index as usize) < bids_guard.len() {
-                bids_guard.remove(index as usize);
+            if (index as usize) < self.bids.len() {
+                self.bids.remove(index as usize);
             }
         }
 
         // Remove from Asks
         asks_to_remove.sort_by(|a, b| b.cmp(a));
         for index in asks_to_remove {
-            if (index as usize) < asks_guard.len() {
-                asks_guard.remove(index as usize);
+            if (index as usize) < self.asks.len() {
+                self.asks.remove(index as usize);
             }
         }
 
         // Release order vector locks before rebuilding indices
-        drop(bids_guard);
-        drop(asks_guard);
+        
 
         // 3. Rebuild the top indices
-        self.prepare_bids_index().await;
-        self.prepare_asks_index().await;
+        self.prepare_bids_index();
+        self.prepare_asks_index();
     }
 
     /// Attempts to cancel an order by its ID.
     /// Returns `true` if the order was found and canceled, `false` otherwise.
-    pub async fn cancel_order(&self, order_id: u64) -> bool {
+    pub async fn cancel_order(&mut self, order_id: u64) -> bool {
         // --- 1. Scan Bids and Asks for Order ID to get the array index ---
         // This array index is needed for removal and to check the top index vector.
 
         let mut order_array_index: Option<(OrderIndex, bool)> = None; // (index, is_buy)
 
         // Acquire read locks on bids and asks
-        let bids_guard = self.bids.read().await;
-        let asks_guard = self.asks.read().await;
 
         // Search Bids for the Order ID
-        if let Some((index, _)) = bids_guard
+        if let Some((index, _)) = self.bids
             .iter()
             .enumerate()
             .find(|(_, order)| order.order_id == order_id)
@@ -430,7 +458,7 @@ impl OrderBook {
 
         // Search Asks for the Order ID
         if order_array_index.is_none() {
-            if let Some((index, _)) = asks_guard
+            if let Some((index, _)) = self.asks
                 .iter()
                 .enumerate()
                 .find(|(_, order)| order.order_id == order_id)
@@ -439,9 +467,7 @@ impl OrderBook {
             }
         }
 
-        // Drop read locks on bids/asks
-        drop(bids_guard);
-        drop(asks_guard);
+
 
         let (index_to_remove, is_buy) = match order_array_index {
             Some(data) => data,
@@ -449,41 +475,36 @@ impl OrderBook {
         };
 
         // --- 2. Scan Top Index and Clear if Order is in the Top ---
-        let mut top_index_write_guard = if is_buy {
-            self.top_bids_index.write().await
+        if is_buy {
+            self.top_bids_index.clear();
         } else {
-            self.top_asks_index.write().await
+            self.top_asks_index.clear();
         };
 
         // If the order's array index is present in the top index list, clear the list.
-        if top_index_write_guard.contains(&index_to_remove) {
-            top_index_write_guard.clear();
-        }
+        
 
-        // Drop the write lock on the top index
-        drop(top_index_write_guard);
-
+    
         // --- 3. Remove from Bids or Asks Array ---
 
         // Acquire the write lock on the correct order vector
         if is_buy {
-            let mut bids_guard = self.bids.write().await;
+            
             // Remove the order. Note: Vec::remove is O(N) but simplifies the example.
-            if (index_to_remove as usize) < bids_guard.len() {
-                bids_guard.remove(index_to_remove as usize);
+            if (index_to_remove as usize) < self.bids.len() {
+                self.bids.remove(index_to_remove as usize);
             }
-            drop(bids_guard); // Release lock before re-indexing
-        } else {
-            let mut asks_guard = self.asks.write().await;
-            if (index_to_remove as usize) < asks_guard.len() {
-                asks_guard.remove(index_to_remove as usize);
+           
+           
+            if (index_to_remove as usize) < self.asks.len() {
+                self.asks.remove(index_to_remove as usize);
             }
-            drop(asks_guard); // Release lock before re-indexing
+           
         }
 
         // --- 4. Rebuild the indices ---
         // Must be done after removal because array indices for other orders may have changed.
-        self.prepare_index().await;
+        self.prepare_index();
 
         true // Order was successfully canceled
     }

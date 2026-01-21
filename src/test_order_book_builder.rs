@@ -24,7 +24,8 @@ impl TestOrderBookBuilder {
 
     /// Runs the main loop to receive and process UDP messages.
     pub async fn start_run(&mut self) {
-        let order_book = self.state.order_book.clone();
+        let mut order_book = self.state.order_book.write().await;
+        
         for i in 0..self.test_order_book_size {
             let order = self.create_buy_order(i);
             order_book.fuel_order(order).await;
@@ -33,7 +34,7 @@ impl TestOrderBookBuilder {
             let order = self.create_sell_order(i, self.test_order_book_size);
             order_book.fuel_order(order).await;
         }
-        order_book.prepare_index().await;
+        order_book.prepare_index();
     }
     pub fn create_buy_order(&self, index: u32) -> Order {
         //let time_now = time::Instant::now().elapsed().as_nanos() as u64;
@@ -50,6 +51,7 @@ impl TestOrderBookBuilder {
             quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
+            is_mocked_order:false,
         }
     }
 
@@ -68,6 +70,7 @@ impl TestOrderBookBuilder {
             quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
+            is_mocked_order:false,
         }
     }
 }

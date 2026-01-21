@@ -24,6 +24,7 @@ use order_matcher::OrderMatcher;
 use test_order_book_builder::TestOrderBookBuilder;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
+// use tokio_console::ConsoleLayer;
 
 const DEFAULT_TRADE_ADDR: &str = "239.0.0.1:5000";
 const DEFAULT_STATUS_ADDR: &str = "239.0.0.2:5001";

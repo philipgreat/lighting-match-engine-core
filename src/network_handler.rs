@@ -32,7 +32,7 @@ impl NetworkHandler {
     /// Runs the main loop to receive and process UDP messages.
     pub async fn run_receive_loop(&mut self) {
         let mut buf = [0u8; MESSAGE_TOTAL_SIZE];
-        //println!("Network handler started, listening for messages...");
+        println!("Network handler started, listening for messages...");
 
         loop {
             match self.socket.recv_from(&mut buf).await {
@@ -45,10 +45,10 @@ impl NetworkHandler {
                         continue;
                     }
 
-                    // println!(
-                    //     "Received packet from {}. Size: {} bytes. Processing...",
-                    //     sender_addr, len
-                    // );
+                    println!(
+                        "Received packet from {}. Size: {} bytes. Processing...",
+                        sender_addr, len
+                    );
                     self.process_single_message(&buf).await;
                 }
                 Err(e) => {
@@ -82,7 +82,7 @@ impl NetworkHandler {
                     //     order.product_id, order.order_type, order.price, order.quantity
                     // );
                     let mut total_count = self.state.total_received_orders.write().await;
-
+                    println!("deserialize_order");
                     *total_count += 1;
                     IncomingMessage::Order(order)
                 }
