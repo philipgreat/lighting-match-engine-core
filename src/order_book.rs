@@ -21,9 +21,8 @@ pub struct MatchedRestingOrder {
 
 /// The core trait for sending match results (trade signals) to an external system.
 /// The implementation will be external to this file.
-pub trait ResultSender: Send + Sync {
-    // Added Send + Sync for concurrent use
-    async fn send_result(&self, result: MatchResult);
+pub trait ResultSender: Send {
+    fn send_result(&self, result: MatchResult);
 }
 
 // --- OrderBook Definition ---
@@ -324,7 +323,7 @@ impl OrderBook {
                 internal_match_time: (time_lapsed) as u32,
             };
 
-            sender.send_result(match_result).await;
+            sender.send_result(match_result);
 
 
             // Remove the first index (the index of the matched order)

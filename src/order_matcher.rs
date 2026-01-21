@@ -81,11 +81,8 @@ impl OrderMatcher {
     }
 }
 impl ResultSender for OrderMatcher {
-    /// Implements the required method to send a MatchResult.
-    async fn send_result(&self, result: MatchResult) {
-        self.sender.send(result).await.expect("send error");
-        self.state.increase_match().await;
-
-        //println!("result to send: {:?}", result)
+    fn send_result(&self, result: MatchResult) {
+        let _ = self.sender.try_send(result);
     }
+    
 }
