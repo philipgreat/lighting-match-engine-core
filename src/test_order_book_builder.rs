@@ -1,7 +1,6 @@
 use crate::data_types::{
     EngineState, ORDER_PRICE_TYPE_LIMIT, ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
 };
-use crate::network_handler::NetworkHandler;
 
 use std::sync::Arc;
 

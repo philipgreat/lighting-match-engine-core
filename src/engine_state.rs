@@ -3,7 +3,6 @@ use crate::message_codec;
 use tokio::net::UdpSocket;
 use tokio::sync::RwLock;
 use tokio::time::{self, Duration};
-use tokio::sync::Mutex;
 use crate::data_types::OrderBook;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -19,7 +18,7 @@ impl EngineState {
         EngineState {
             instance_tag,
             product_id,
-            order_book: Arc::new(RwLock::new(OrderBook::new(10000, 10000))),
+            order_book: Arc::new(RwLock::new(OrderBook::new(10000, 100))),
             matched_orders: Arc::new(RwLock::new(0)),
             total_received_orders: Arc::new(RwLock::new(0)),
             start_time: now_nanos,

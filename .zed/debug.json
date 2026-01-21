@@ -1,0 +1,28 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  {
+    "label": "Trade Core Debug ",
+    "build": {
+      "command": "cargo",
+      "args": ["build"]
+    },
+    "program": "./target/debug/lighting-match-engine-core",
+    "args": [
+      // 这里是你要传递给程序的命令行参数
+      "--prodid",
+      "7",
+      "--name",
+      "AAPL",
+      "--test-order-book-size",
+      "10k"
+    ],
+
+    // sourceLanguages is required for CodeLLDB (not GDB) when using Rust
+    "sourceLanguages": ["rust"],
+    "request": "launch",
+    "adapter": "CodeLLDB"
+  }
+]

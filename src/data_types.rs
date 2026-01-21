@@ -73,6 +73,7 @@ pub struct MatchResult {
     pub quantity: u32,            // Trade quantity (4 bytes)
     pub trade_time_network: u32,  // Trade timestamp (Nanoseconds) (4 bytes)
     pub internal_match_time: u32, // Total Payload Size: 46 bytes
+    pub is_mocked_result: bool,
 }
 
 // Enum to unify incoming messages from the network
@@ -106,6 +107,9 @@ pub struct OrderBook {
     // Configuration
     pub init_order_book_size: u32,
     pub init_top_index_size: u32,
+
+    pub bids_index_used: usize,
+    pub asks_index_used: usize,
 }
 
 // Engine State and Context

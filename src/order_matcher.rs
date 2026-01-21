@@ -1,12 +1,10 @@
 use crate::data_types::{
-    EngineState, IncomingMessage, MatchResult, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET,
-    ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
+    EngineState, IncomingMessage, MatchResult, Order,
 };
 use crate::order_book::ResultSender;
 
-use std::cmp::Ordering;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+
 use tokio::sync::mpsc::{Receiver, Sender};
 /// Handler responsible for the core order matching logic.
 pub struct OrderMatcher {
