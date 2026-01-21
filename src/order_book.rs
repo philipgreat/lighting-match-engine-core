@@ -1,5 +1,5 @@
 use crate::date_time_tool::current_timestamp;
-use crate::high_resolution_timer::HighResultionCounter;
+use crate::high_resolution_timer::HighResolutionCounter;
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
@@ -237,7 +237,7 @@ impl OrderBook {
 
         loop {
             //println!("1entering match_against_side");
-            let timer = HighResultionCounter::start(3.0);
+            let timer = HighResolutionCounter::start(0.8);
             // println!("info: matched order size {:?}", matched_orders.len());
             // println!("info: matched order  {:?}", new_order);
             // Break condition: new order is fully filled.

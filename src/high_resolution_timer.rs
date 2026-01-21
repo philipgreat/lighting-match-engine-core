@@ -1,94 +1,80 @@
+use std::time::{Duration, Instant};
+
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::_rdtsc;
-use std::time::{Duration, Instant};
 
 /// ------------------------------------------------------------
 /// High-Resolution Timer (Cross-Platform)
 /// ------------------------------------------------------------
-/// • Uses CPU hardware timestamp counter (TSC) on x86/x86_64
-/// • Falls back to `Instant::now()` on non-x86 platforms (e.g. Apple Silicon)
-/// • Nanosecond precision (depending on hardware & OS)
-/// • Lightweight, lock-free, no allocations
-///
-/// Example:
-/// ```
-/// let timer = HighResCounter::start(5.0); // CPU at 5.0 GHz
-/// do_work();
-/// println!("Elapsed: {} ns", timer.ns());
-/// ```
-pub struct HighResultionCounter {
+/// • x86/x86_64: Uses `rdtsc`
+/// • ARM64/AArch64 (Apple Silicon): Uses `cntvct_el0`
+/// • Others: Falls back to `Instant::now()`
+pub struct HighResolutionCounter {
     start_cycles: u64,
     start_time: Instant,
-    cpu_ghz: f64,
+    tick_ghz: f64,
 }
 
-impl HighResultionCounter {
-    /// Start the high-resolution timer.
-    ///
-    /// `cpu_ghz` – your CPU base frequency in GHz
-    /// (e.g. 3.5 for 3.5 GHz, 5.0 for 5 GHz)
-    pub fn start(cpu_ghz: f64) -> Self {
-        // Capture the starting CPU cycle counter if supported
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-        let start_cycles = unsafe { _rdtsc() };
-
-        // Fallback for non-x86 (e.g. ARM / Apple Silicon)
-        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-        let start_cycles = 0;
+impl HighResolutionCounter {
+    /// Start the timer.
+    /// Note: `tick_ghz` is the frequency of the counter, not necessarily 
+    /// the CPU's boost clock. 
+    /// - On Apple Silicon, this is usually 0.024 (24 MHz).
+    pub fn start(tick_ghz: f64) -> Self {
+        let start_cycles = Self::get_ticks();
 
         Self {
             start_cycles,
             start_time: Instant::now(),
-            cpu_ghz,
+            tick_ghz,
         }
+    }
+
+    #[inline(always)]
+    fn get_ticks() -> u64 {
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        unsafe { _rdtsc() }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            let val: u64;
+            unsafe {
+                // Read the virtual count register
+                std::arch::asm!("mrs {}, cntvct_el0", out(reg) val);
+            }
+            val
+        }
+
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+        0
     }
 
     /// Return elapsed time in **nanoseconds**.
     pub fn ns(&self) -> u128 {
+        //0.024
+        #[cfg(any(target_arch = "aarch64"))]
+        {
+            let end = Self::get_ticks();
+            let delta_cycles = end.wrapping_sub(self.start_cycles);
+            // Convert cycles → nanoseconds (Cycles / GHz)
+            //return (delta_cycles as f64 / self.tick_ghz) as u128;
+            return (delta_cycles as f64/0.024) as u128;
+        }
+
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
-            let end = unsafe { _rdtsc() };
-            let delta_cycles = end - self.start_cycles;
-            // Convert cycles → nanoseconds
-            let ns = (delta_cycles as f64 / self.cpu_ghz) as u128;
-            return ns;
+            let end = Self::get_ticks();
+            let delta_cycles = end.wrapping_sub(self.start_cycles);
+            // Convert cycles → nanoseconds (Cycles / GHz)
+            //return (delta_cycles as f64 / self.tick_ghz) as u128;
+            return (delta_cycles as f64 / self.tick_ghz) as u128;
         }
 
-        // Fallback using `Instant::elapsed`
-        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64")))]
-        {
-            return self.start_time.elapsed().as_nanos();
-        }
+        #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
+        self.start_time.elapsed().as_nanos()
     }
 
-    /// Return elapsed time in **microseconds** (float).
-    pub fn us(&self) -> f64 {
-        self.ns() as f64 / 1_000.0
-    }
-
-    /// Return elapsed time in **milliseconds** (float).
-    pub fn ms(&self) -> f64 {
-        self.ns() as f64 / 1_000_000.0
-    }
-
-    /// Return elapsed time as a standard `Duration`.
-    pub fn duration(&self) -> Duration {
-        Duration::from_nanos(self.ns() as u64)
-    }
+    pub fn us(&self) -> f64 { self.ns() as f64 / 1_000.0 }
+    pub fn ms(&self) -> f64 { self.ns() as f64 / 1_000_000.0 }
+    pub fn duration(&self) -> Duration { Duration::from_nanos(self.ns() as u64) }
 }
-
-// fn main() {
-//     // You can obtain the CPU frequency via:
-//     //  • Linux:   `lscpu | grep "MHz"`
-//     //  • macOS:   `sysctl hw.cpufrequency`
-//     //  • Windows: PowerShell → `(Get-CimInstance Win32_Processor).MaxClockSpeed`
-//     let timer = HighResuCounter::start(5.0); // 5 GHz CPU
-
-//     // --- Code to measure ---
-//     let mut sum = 0u64;
-//     for i in 0..1_000_000 {
-//         sum = sum.wrapping_add(i);
-//     }
-
-//     println!("Elapsed: {} ns", timer.ns());
-// }
