@@ -237,7 +237,7 @@ impl OrderBook {
 
         loop {
             //println!("1entering match_against_side");
-            let timer = HighResolutionCounter::start(0.8);
+            let timer = HighResolutionCounter::start(2.8);
             // println!("info: matched order size {:?}", matched_orders.len());
             // println!("info: matched order  {:?}", new_order);
             // Break condition: new order is fully filled.
