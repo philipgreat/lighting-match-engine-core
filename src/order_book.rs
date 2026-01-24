@@ -22,6 +22,8 @@ pub struct MatchedRestingOrder {
 /// The implementation will be external to this file.
 pub trait ResultSender: Send {
     fn send_result(&self, result: MatchResult);
+    // fn send_results(&self, results: Vec<MatchResult>);
+    
 }
 
 // --- OrderBook Definition ---
@@ -121,6 +123,7 @@ impl OrderBook {
 
         //let mut top_bids_index_guard = self.top_bids_index.write().await;
         self.top_bids_index.clear();
+        self.bids_index_used = 0;
 
         // 5. Take the first N indices (top orders)
         let max_size = self.init_top_index_size as usize;
@@ -165,7 +168,7 @@ impl OrderBook {
         // 4. Acquire write lock for top_asks_index
         //let mut top_asks_index_guard = self.top_asks_index.write().await;
         self.top_asks_index.clear();
-        self.bids_index_used = 0;
+        self.asks_index_used = 0;
         // 5. Take the first N indices (top orders)
         let max_size = self.init_top_index_size as usize;
         for (index, _, _) in indexed_asks.into_iter().take(max_size) {
@@ -233,11 +236,16 @@ impl OrderBook {
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
-        let start_time = current_timestamp();
+        
+        let timer = HighResolutionCounter::start(2.8);
+        
 
+        let start_time = timer.ns();
+        
         loop {
+            
             //println!("1entering match_against_side");
-            let timer = HighResolutionCounter::start(2.8);
+            
             // println!("info: matched order size {:?}", matched_orders.len());
             // println!("info: matched order  {:?}", new_order);
             // Break condition: new order is fully filled.
@@ -291,6 +299,8 @@ impl OrderBook {
             } else {
                 self.bids_index_used
             };
+
+
 
             // Get the index of the best resting order (index 0 in the top list)
             let resting_order_index = top_index[top_index_used];
@@ -347,13 +357,15 @@ impl OrderBook {
                 (resting_order.order_id, new_order.order_id)
             };
 
-            let time_lapsed = timer.ns();
-            let end_time = start_time + (time_lapsed as u64);
+            
             if match_against_asks {
                 self.asks_index_used = self.asks_index_used + 1;
             } else {
                 self.bids_index_used = self.bids_index_used + 1;
             };
+
+
+
             let match_result = MatchResult {
                 // ... (fields populated) ...
                 instance_tag: [0; 16],
@@ -362,12 +374,12 @@ impl OrderBook {
                 sell_order_id: sell_id,
                 price: trade_price,
                 quantity: trade_quantity,
-                trade_time_network: (start_time - new_order.submit_time) as u32,
-                internal_match_time: (time_lapsed) as u32,
+                trade_time_network: (new_order.submit_time) as u32,
+                internal_match_time: 0,
                 is_mocked_result: new_order.is_mocked_order,
             };
 
-            sender.send_result(match_result);
+            //sender.send_result(match_result);
 
             let needs_to_rebuild_index = if match_against_asks {
                 self.need_to_rebuild_asks_index()
@@ -383,7 +395,25 @@ impl OrderBook {
             // Loop continues to check if more orders can be matched.
         }
         let result = matched_orders.clone();
-        self.post_match(matched_orders);
+        
+        let end_time = timer.ns();
+        let match_result = MatchResult {
+                // ... (fields populated) ...
+                instance_tag: [0; 16],
+                product_id: new_order.product_id,
+                buy_order_id: 0,
+                sell_order_id: 0,
+                price: 0,
+                quantity: 0,
+                trade_time_network: 0,
+                internal_match_time: (end_time -start_time) as u32,
+                is_mocked_result: new_order.is_mocked_order,
+            };
+            
+            sender.send_result(match_result);
+            
+            self.post_match(matched_orders);
+
 
         result
     }

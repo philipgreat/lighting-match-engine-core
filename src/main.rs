@@ -195,7 +195,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => {
             eprintln!("Configuration Error: {}", e);
             eprintln!(
-                "Usage: --name <tag_8_chars_max> --prodid <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]"
+                "Usage: --name <tag_16_chars_max> --prodid <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]"
             );
             return Err(e.into());
         }
