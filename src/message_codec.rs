@@ -1,6 +1,6 @@
 use crate::data_types::{
     BroadcastStats, CancelOrder, MESSAGE_TOTAL_SIZE, MSG_ORDER_CANCEL, MSG_ORDER_SUBMIT,
-    MSG_STATUS_BROADCAST, MSG_TRADE_BROADCAST, Trade, Order,MatchResult
+    MSG_STATUS_BROADCAST, MSG_TRADE_BROADCAST, MatchResult, Order, Trade,
 };
 
 /// Calculates a simple XOR checksum for the payload starting after the type byte (index 2).
@@ -91,59 +91,58 @@ pub fn serialize_single_trade(result: &Trade) -> [u8; MESSAGE_TOTAL_SIZE] {
     buf
 }
 
-pub fn serialize_single_trade_share_time(result: &Trade, time_per_trade: u32) -> [u8; MESSAGE_TOTAL_SIZE] {
+pub fn serialize_single_trade_share_time(
+    result: &Trade,
+    time_per_trade: u32,
+) -> [u8; MESSAGE_TOTAL_SIZE] {
     let mut buf = [0u8; MESSAGE_TOTAL_SIZE];
     let payload_start = 2;
 
     buf[1] = MSG_TRADE_BROADCAST;
 
-    // Instance Tag ([u8; 8])
+    // Instance Tag ([u8; 16])
     buf[payload_start..payload_start + 16].copy_from_slice(&result.instance_tag);
     // Product ID (u16)
-    buf[payload_start + 8..payload_start + 10].copy_from_slice(&result.product_id.to_be_bytes());
+    buf[payload_start + 16..payload_start + 18].copy_from_slice(&result.product_id.to_be_bytes());
     // Buy Order ID (u64)
-    buf[payload_start + 10..payload_start + 18].copy_from_slice(&result.buy_order_id.to_be_bytes());
+    buf[payload_start + 18..payload_start + 26].copy_from_slice(&result.buy_order_id.to_be_bytes());
     // Sell Order ID (u64)
-    buf[payload_start + 18..payload_start + 26]
+    buf[payload_start + 26..payload_start + 34]
         .copy_from_slice(&result.sell_order_id.to_be_bytes());
     // Price (u64)
-    buf[payload_start + 26..payload_start + 34].copy_from_slice(&result.price.to_be_bytes());
+    buf[payload_start + 34..payload_start + 42].copy_from_slice(&result.price.to_be_bytes());
     // Quantity (u32)
-    buf[payload_start + 34..payload_start + 38].copy_from_slice(&result.quantity.to_be_bytes());
+    buf[payload_start + 42..payload_start + 46].copy_from_slice(&result.quantity.to_be_bytes());
     // Trade Time (u64)
-    buf[payload_start + 38..payload_start + 42]
+    buf[payload_start + 46..payload_start + 50]
         .copy_from_slice(&result.trade_time_network.to_be_bytes());
-    buf[payload_start + 42..payload_start + 46]
+    buf[payload_start + 50..payload_start + 54]
         .copy_from_slice(&time_per_trade.to_be_bytes());
-    // Padding to 50 bytes is implicit by the array size (index 48 is the last element used)
 
-    // Checksum calculation and placement
     buf[0] = calculate_checksum(&buf);
 
     buf
 }
 
-pub fn serialize_match_result(result: &MatchResult,) -> Vec<Vec<u8>> {
+pub fn serialize_match_result(result: &MatchResult) -> Vec<Vec<u8>> {
     const BATCH_SIZE: usize = 20;
 
     let mut batches = Vec::new();
-    
+
     let time_per_trade = result.time_per_trade();
     for chunk in result.trade_list.chunks(BATCH_SIZE) {
-        let mut buf =
-            Vec::with_capacity(MESSAGE_TOTAL_SIZE * chunk.len());
-        
+        let mut buf = Vec::with_capacity(MESSAGE_TOTAL_SIZE * chunk.len());
+
         for trade in chunk {
-            let single = serialize_single_trade_share_time(trade,time_per_trade);
+            let single = serialize_single_trade_share_time(trade, time_per_trade);
             buf.extend_from_slice(&single);
         }
-        
+
         batches.push(buf);
     }
 
     batches
 }
-
 
 /// Serializes a BroadcastStats struct into a 50-byte network buffer.
 pub fn serialize_stats_result(stats: &BroadcastStats) -> [u8; MESSAGE_TOTAL_SIZE] {

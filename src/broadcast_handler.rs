@@ -1,4 +1,4 @@
-use crate::data_types::{ EngineState,MatchResult};
+use crate::data_types::{EngineState, MatchResult};
 use crate::message_codec;
 
 use tokio::net::UdpSocket;
@@ -41,17 +41,13 @@ impl TradeNetworkTime {
             // Serialize the Trade into the fixed 50-byte buffer
             //
             let mut match_orders = self.state.matched_orders.write().await;
-                    //println!("deserialize_order");
+            //println!("deserialize_order");
             *match_orders += result.total_count() as u64;
-            
+
             let chunks = message_codec::serialize_match_result(&result);
 
             for buf in chunks {
-                if let Err(e) = self
-                    .socket
-                    .send_to(&buf, self.trade_multicast_addr)
-                    .await
-                {
+                if let Err(e) = self.socket.send_to(&buf, self.trade_multicast_addr).await {
                     eprintln!("Error sending trade broadcast: {}", e);
                 }
             }
