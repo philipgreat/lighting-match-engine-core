@@ -137,7 +137,7 @@ pub fn serialize_match_result(result: &MatchResult,) -> Vec<Vec<u8>> {
             let single = serialize_single_trade_share_time(trade,time_per_trade);
             buf.extend_from_slice(&single);
         }
-
+        
         batches.push(buf);
     }
 

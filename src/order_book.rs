@@ -1,4 +1,5 @@
 
+use crate::date_time_tool::current_timestamp;
 use crate::high_resolution_timer::HighResolutionCounter;
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
@@ -258,12 +259,12 @@ impl OrderBook {
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
-        
+        let engine_received_time = current_timestamp();
         let timer = HighResolutionCounter::start(28*100_000_000);
         let mut match_result = MatchResult::new(20);
 
         let start_time = timer.ns();
-        match_result.start_time=start_time as u64;
+        match_result.start_time = start_time as u64;
         
         loop {
             
@@ -397,7 +398,7 @@ impl OrderBook {
                 sell_order_id: sell_id,
                 price: trade_price,
                 quantity: trade_quantity,
-                trade_time_network: (new_order.submit_time) as u32,
+                trade_time_network: (engine_received_time - new_order.submit_time) as u32,
                 internal_match_time: 0,
                 is_mocked_result: new_order.is_mocked_order,
             };
