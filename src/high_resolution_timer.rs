@@ -12,20 +12,20 @@ use core::arch::x86_64::{_rdtsc, _mm_lfence};
 pub struct HighResolutionCounter {
     start_cycles: u64,
     start_time: Instant,
-    tick_ghz: f64,
+    tick_hz: u64,
 }
 
 impl HighResolutionCounter {
     /// Start the timer.
     /// - On Apple Silicon: tick_ghz is ignored (internally uses 0.024)
     /// - On Linux/x86: Pass the calibrated TSC frequency (e.g., 2.4)
-    pub fn start(tick_ghz: f64) -> Self {
+    pub fn start(tick_hz: u64) -> Self {
         let start_cycles = Self::get_ticks();
 
         Self {
             start_cycles,
             start_time: Instant::now(),
-            tick_ghz,
+            tick_hz,
         }
     }
 
@@ -65,13 +65,13 @@ impl HighResolutionCounter {
         {
             // Apple Silicon hardware counter frequency is fixed at 24MHz
             // 1 / 24MHz = 41.666ns per tick.
-            return (delta as f64 / 0.024) as u128;
+            return (delta *1_000_000_000 / 24_000_000) as u128;
         }
-
+        
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         {
             // On Linux/x86, we use the tick_ghz passed at start
-            return (delta as f64 / self.tick_ghz) as u128;
+            return (delta*1_000_000_000 / self.tick_hz) as u128;
         }
 
         #[cfg(not(any(target_arch = "x86", target_arch = "x86_64", target_arch = "aarch64")))]
@@ -84,3 +84,4 @@ impl HighResolutionCounter {
     pub fn ms(&self) -> f64 { self.ns() as f64 / 1_000_000.0 }
     pub fn duration(&self) -> Duration { Duration::from_nanos(self.ns() as u64) }
 }
+

@@ -1,10 +1,10 @@
-use crate::date_time_tool::current_timestamp;
+
 use crate::high_resolution_timer::HighResolutionCounter;
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
-    MatchResult, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_SELL,
-    Order, OrderBook, OrderIndex,
+    Trade, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_SELL,
+    Order, OrderBook, OrderIndex,MatchResult
 };
 
 // --- Helper Structs and Trait ---
@@ -22,7 +22,7 @@ pub struct MatchedRestingOrder {
 /// The implementation will be external to this file.
 pub trait ResultSender: Send {
     fn send_result(&self, result: MatchResult);
-    // fn send_results(&self, results: Vec<MatchResult>);
+    // fn send_results(&self, results: Vec<Trade>);
     
 }
 
@@ -44,7 +44,29 @@ pub trait ResultSender: Send {
 //     // Max number of best-priced indices to keep in top_bids_index and top_asks_index
 //     pub init_top_index_size: u32,
 // }
+impl MatchResult {
+     pub fn new(init_trade_size: usize) -> Self{
+        MatchResult {
+            start_time:0,
+            end_time:0,
+            trade_list: Vec::with_capacity(init_trade_size),
+        }
+     }
+     pub fn add_trade(&mut self,trade: Trade){
+        self.trade_list.push(trade);
+     }
+     pub fn total_count(& self)->u32{
+        self.trade_list.len() as u32
+     }
+     pub fn total_time(self)-> u64{
+       self.end_time - self.start_time
+     }
+     pub fn time_per_trade(&self)->u32{
+        ((self.end_time-self.start_time) / self.total_count() as u64) as u32
+     }
+     
 
+}
 impl OrderBook {
     /// Constructs a new OrderBook with specified initial capacities.
     pub fn new(initial_book_size: u32, initial_top_size: u32) -> Self {
@@ -237,10 +259,11 @@ impl OrderBook {
     ) -> Vec<MatchedRestingOrder> {
         let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
         
-        let timer = HighResolutionCounter::start(2.8);
-        
+        let timer = HighResolutionCounter::start(28*100_000_000);
+        let mut match_result = MatchResult::new(20);
 
         let start_time = timer.ns();
+        match_result.start_time=start_time as u64;
         
         loop {
             
@@ -350,7 +373,7 @@ impl OrderBook {
                 is_buy: !match_against_asks,
             });
 
-            // Send the MatchResult signal
+            // Send the Trade signal
             let (buy_id, sell_id) = if new_order.order_type == ORDER_TYPE_BUY {
                 (new_order.order_id, resting_order.order_id)
             } else {
@@ -366,7 +389,7 @@ impl OrderBook {
 
 
 
-            let match_result = MatchResult {
+            let single_trade = Trade {
                 // ... (fields populated) ...
                 instance_tag: [0; 16],
                 product_id: new_order.product_id,
@@ -378,8 +401,8 @@ impl OrderBook {
                 internal_match_time: 0,
                 is_mocked_result: new_order.is_mocked_order,
             };
-
-            //sender.send_result(match_result);
+            match_result.add_trade(single_trade);
+            //sender.send_result(single_trade);
 
             let needs_to_rebuild_index = if match_against_asks {
                 self.need_to_rebuild_asks_index()
@@ -397,23 +420,12 @@ impl OrderBook {
         let result = matched_orders.clone();
         
         let end_time = timer.ns();
-        let match_result = MatchResult {
-                // ... (fields populated) ...
-                instance_tag: [0; 16],
-                product_id: new_order.product_id,
-                buy_order_id: 0,
-                sell_order_id: 0,
-                price: 0,
-                quantity: 0,
-                trade_time_network: 0,
-                internal_match_time: (end_time -start_time) as u32,
-                is_mocked_result: new_order.is_mocked_order,
-            };
+        match_result.end_time =end_time as u64;
+        
             
-            sender.send_result(match_result);
+        sender.send_result(match_result);
             
-            self.post_match(matched_orders);
-
+        self.post_match(matched_orders);
 
         result
     }

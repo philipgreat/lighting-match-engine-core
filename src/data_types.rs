@@ -20,8 +20,14 @@ pub const ORDER_TYPE_MOCK_SELL: u8 = 4; // Order side: mock sell
 pub const ORDER_PRICE_TYPE_LIMIT: u8 = 1; // Order price type: Limit
 pub const ORDER_PRICE_TYPE_MARKET: u8 = 2; // Order price type: Market
 
+pub const TRADE_TYPE_REAL: u8 = 0; // Order price type: Limit
+pub const TRADE_TYPE_MOCK: u8 = 1; // Order price type: Market
+
+
+
 // --- Message Size Constant ---
 pub const MESSAGE_TOTAL_SIZE: usize = 64; // All network packets are 64 bytes fixed size.
+
 
 // --- Data Structure Definitions ---
 
@@ -64,8 +70,8 @@ pub struct BroadcastStats {
 
 // Match Result Structure (for MSG_TRADE_BROADCAST)
 #[derive(Debug, Clone)]
-pub struct MatchResult {
-    pub instance_tag: [u8; 16],    // 8-byte engine instance tag
+pub struct Trade {
+    pub instance_tag: [u8; 16],    // 16-byte engine instance tag
     pub product_id: u16,          // Product identifier (2 bytes)
     pub buy_order_id: u64,        // Buyer's order ID (8 bytes)
     pub sell_order_id: u64,       // Seller's order ID (8 bytes)
@@ -74,6 +80,15 @@ pub struct MatchResult {
     pub trade_time_network: u32,  // Trade timestamp (Nanoseconds) (4 bytes)
     pub internal_match_time: u32, // Total Payload Size: 46 bytes
     pub is_mocked_result: bool,
+}
+#[derive(Debug, Clone)]
+pub struct MatchResult {
+    pub trade_list:Vec<Trade>,
+    pub start_time: u64,
+    pub end_time: u64,
+    
+
+
 }
 
 // Enum to unify incoming messages from the network

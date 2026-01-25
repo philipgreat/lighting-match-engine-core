@@ -1,5 +1,5 @@
 use crate::data_types::{
-    EngineState, IncomingMessage, MatchResult, Order,
+    EngineState, IncomingMessage, Trade, Order,MatchResult,
 };
 use crate::order_book::ResultSender;
 
