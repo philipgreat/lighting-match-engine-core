@@ -59,7 +59,7 @@ Get up and running in minutes!
 
 ![test screen shot ](docs/test-screen-shot.png)
 
-  That's an internal match time(core-matching latency) of just **3346 nanoseconds** with 1M asks and bids respectively!
+  That's an internal match time(core-matching latency) of just **75 nanoseconds** with 1M asks and bids respectively!
 
 ## ⚙️ How It Works
 

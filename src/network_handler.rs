@@ -82,7 +82,7 @@ impl NetworkHandler {
                     //     order.product_id, order.order_type, order.price, order.quantity
                     // );
                     let mut total_count = self.state.total_received_orders.write().await;
-                    println!("deserialize_order");
+                    //println!("deserialize_order");
                     *total_count += 1;
                     IncomingMessage::Order(order)
                 }
