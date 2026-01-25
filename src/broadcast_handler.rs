@@ -1,4 +1,4 @@
-use crate::data_types::{MESSAGE_TOTAL_SIZE, MatchResult};
+use crate::data_types::{ EngineState,MatchResult};
 use crate::message_codec;
 
 use tokio::net::UdpSocket;
@@ -12,6 +12,7 @@ pub struct TradeNetworkTime {
     socket: Arc<UdpSocket>,
     trade_multicast_addr: SocketAddr,
     receiver: Receiver<MatchResult>,
+    state: Arc<EngineState>,
 }
 
 impl TradeNetworkTime {
@@ -20,11 +21,13 @@ impl TradeNetworkTime {
         socket: Arc<UdpSocket>,
         trade_multicast_addr: SocketAddr,
         receiver: Receiver<MatchResult>,
+        state: Arc<EngineState>,
     ) -> Self {
         TradeNetworkTime {
             socket,
             trade_multicast_addr,
             receiver,
+            state,
         }
     }
 
@@ -37,6 +40,10 @@ impl TradeNetworkTime {
         while let Some(result) = self.receiver.recv().await {
             // Serialize the Trade into the fixed 50-byte buffer
             //
+            let mut match_orders = self.state.matched_orders.write().await;
+                    //println!("deserialize_order");
+            *match_orders += result.total_count() as u64;
+            
             let chunks = message_codec::serialize_match_result(&result);
 
             for buf in chunks {

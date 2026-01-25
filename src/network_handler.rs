@@ -45,10 +45,10 @@ impl NetworkHandler {
                         continue;
                     }
 
-                    println!(
-                        "Received packet from {}. Size: {} bytes. Processing...",
-                        sender_addr, len
-                    );
+                    // println!(
+                    //     "Received packet from {}. Size: {} bytes. Processing...",
+                    //     sender_addr, len
+                    // );
                     self.process_single_message(&buf).await;
                 }
                 Err(e) => {

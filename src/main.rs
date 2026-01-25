@@ -257,10 +257,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         shared_broadcast_socket.clone(),
         engine_state.status_multicast_addr,
         match_rx,
+        engine_state.clone(),
     );
     let status_broadcaster =
         EngineState::new_status_broadcaster(engine_state.clone(), shared_broadcast_socket.clone());
-
+    
     // 6. Run all tasks concurrently
     tokio::select! {
         _ = network_handler.run_receive_loop() => { println!("Network receiver exited."); }
