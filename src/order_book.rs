@@ -216,7 +216,7 @@ impl OrderBook {
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
         //println!("entering match_order");
-        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
+        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(200);
 
         if new_order.order_type == ORDER_TYPE_SELL {
             // New order is a SELL, match against Bids (BUY side)
@@ -258,10 +258,10 @@ impl OrderBook {
         match_against_asks: bool,
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
-        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(20);
+        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(200);
         let engine_received_time = current_timestamp();
         let timer = HighResolutionCounter::start(28*100_000_000);
-        let mut match_result = MatchResult::new(20);
+        let mut match_result = MatchResult::new(200);
 
         let start_time = timer.ns();
         match_result.start_time = start_time as u64;
@@ -412,7 +412,7 @@ impl OrderBook {
             };
 
             if needs_to_rebuild_index {
-                self.post_match(matched_orders.clone());
+                self.post_match(matched_orders.clone(),match_against_asks);
                 matched_orders.clear();
             }
 
@@ -426,7 +426,7 @@ impl OrderBook {
             
         sender.send_result(match_result);
             
-        self.post_match(matched_orders);
+        self.post_match(matched_orders,match_against_asks);
 
         
 
@@ -436,7 +436,7 @@ impl OrderBook {
     // --- Phase 4: Post Match Processing ---
 
     /// Cleans up the order book after a match, deleting/updating resting orders, and rebuilding indices. (async)
-    pub fn post_match(&mut self, matched_orders: Vec<MatchedRestingOrder>) {
+    pub fn post_match(&mut self, matched_orders: Vec<MatchedRestingOrder>,match_against_asks:bool) {
         //println!(" orders matched {}", matched_orders.len());
 
         if matched_orders.is_empty() {
@@ -444,8 +444,8 @@ impl OrderBook {
             return;
         }
 
-        let mut bids_to_remove: Vec<OrderIndex> = Vec::with_capacity(20);
-        let mut asks_to_remove: Vec<OrderIndex> = Vec::with_capacity(20);
+        let mut bids_to_remove: Vec<OrderIndex> = Vec::with_capacity(200);
+        let mut asks_to_remove: Vec<OrderIndex> = Vec::with_capacity(200);
 
         // Acquire write locks for both bids and asks vectors
 
@@ -501,8 +501,13 @@ impl OrderBook {
         // Release order vector locks before rebuilding indices
 
         // 3. Rebuild the top indices
-        self.prepare_bids_index();
-        self.prepare_asks_index();
+        if match_against_asks {
+            self.prepare_asks_index();
+        }else{
+            self.prepare_bids_index();
+        }
+       
+        
     }
 
     /// Attempts to cancel an order by its ID.
@@ -559,7 +564,8 @@ impl OrderBook {
             if (index_to_remove as usize) < self.bids.len() {
                 self.bids.remove(index_to_remove as usize);
             }
-
+            
+        }else{
             if (index_to_remove as usize) < self.asks.len() {
                 self.asks.remove(index_to_remove as usize);
             }
