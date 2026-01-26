@@ -479,7 +479,7 @@ impl OrderBook {
 
         // Remove from Bids
         self.bids_to_remove.sort_unstable_by(|a, b| b.cmp(a));
-        self.bids_to_remove.dedup();
+        //self.bids_to_remove.dedup();
 
         for &index in &self.bids_to_remove {
             if index < self.bids.len() as u32{
@@ -490,7 +490,7 @@ impl OrderBook {
 
         // Remove from Asks
         self.asks_to_remove.sort_unstable_by(|a, b| b.cmp(a));
-        self.asks_to_remove.dedup();
+        //self.asks_to_remove.dedup();
 
         for &index in self.asks_to_remove.iter() {
             if index < self.asks.len() as u32 {
