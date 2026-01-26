@@ -494,7 +494,7 @@ impl OrderBook {
 
         for &index in self.asks_to_remove.iter() {
             if index < self.asks.len() as u32 {
-                self.asks.remove(index as usize);
+                self.asks.swap_remove(index as usize);
             }
         }
         self.asks_to_remove.clear();
@@ -563,12 +563,12 @@ impl OrderBook {
         if is_buy {
             // Remove the order. Note: Vec::remove is O(N) but simplifies the example.
             if (index_to_remove as usize) < self.bids.len() {
-                self.bids.remove(index_to_remove as usize);
+                self.bids.swap_remove(index_to_remove as usize);
             }
             
         }else{
             if (index_to_remove as usize) < self.asks.len() {
-                self.asks.remove(index_to_remove as usize);
+                self.asks.swap_remove(index_to_remove as usize);
             }
         }
 
