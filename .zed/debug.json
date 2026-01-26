@@ -4,7 +4,7 @@
 // see: https://zed.dev/docs/debugger
 [
   {
-    "label": "Trade Core Debug ",
+    "label": "OrderExecution Core Debug ",
     "build": {
       "command": "cargo",
       "args": ["build"]

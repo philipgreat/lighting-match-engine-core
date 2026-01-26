@@ -4,7 +4,7 @@ use crate::high_resolution_timer::HighResolutionCounter;
 // Assuming these are defined in data_types.rs
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
-    Trade, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_SELL,
+    OrderExecution, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_SELL,
     Order, OrderBook, OrderIndex,MatchResult,MatchedRestingOrder
 };
 
@@ -18,7 +18,7 @@ use crate::data_types::{
 /// The implementation will be external to this file.
 pub trait ResultSender: Send {
     fn send_result(&self, result: MatchResult);
-    // fn send_results(&self, results: Vec<Trade>);
+    // fn send_results(&self, results: Vec<OrderExecution>);
     
 }
 
@@ -45,14 +45,14 @@ impl MatchResult {
         MatchResult {
             start_time:0,
             end_time:0,
-            trade_list: Vec::with_capacity(init_trade_size),
+            order_execution_ist: Vec::with_capacity(init_trade_size),
         }
      }
-     pub fn add_trade(&mut self,trade: Trade){
-        self.trade_list.push(trade);
+     pub fn add_order_execution(&mut self,trade: OrderExecution){
+        self.order_execution_ist.push(trade);
      }
      pub fn total_count(& self)->u32{
-        self.trade_list.len() as u32
+        self.order_execution_ist.len() as u32
      }
      pub fn total_time(self)-> u64{
        self.end_time - self.start_time
@@ -258,7 +258,7 @@ impl OrderBook {
         let engine_received_time = current_timestamp();
         let timer = HighResolutionCounter::start(28*100_000_000);
         //let mut match_result = MatchResult::new(200);
-        self.match_result.trade_list.clear();
+        self.match_result.order_execution_ist.clear();
         let start_time = timer.ns();
         self.match_result.start_time = start_time as u64;
         
@@ -358,7 +358,7 @@ impl OrderBook {
 
             // --- Match Calculation ---
             let trade_quantity = new_order.quantity.min(resting_order.quantity);
-            let trade_price = resting_order.price; // Trade price is the resting order's price
+            let trade_price = resting_order.price; // OrderExecution price is the resting order's price
 
             // Update the quantity of the aggressor order
             new_order.quantity -= trade_quantity;
@@ -370,7 +370,7 @@ impl OrderBook {
                 is_buy: !match_against_asks,
             });
 
-            // Send the Trade signal
+            // Send the OrderExecution signal
             let (buy_id, sell_id) = if new_order.order_type == ORDER_TYPE_BUY {
                 (new_order.order_id, resting_order.order_id)
             } else {
@@ -386,7 +386,7 @@ impl OrderBook {
 
 
 
-            let single_trade = Trade {
+            let order_execution = OrderExecution {
                 // ... (fields populated) ...
                 instance_tag: [0; 16],
                 product_id: new_order.product_id,
@@ -398,8 +398,8 @@ impl OrderBook {
                 internal_match_time: 0,
                 is_mocked_result: new_order.is_mocked_order,
             };
-            self.match_result.add_trade(single_trade);
-            //sender.send_result(single_trade);
+            self.match_result.add_order_execution(order_execution);
+            //sender.send_result(order_execution);
 
             let needs_to_rebuild_index = if match_against_asks {
                 self.need_to_rebuild_asks_index()

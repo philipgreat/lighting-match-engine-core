@@ -15,7 +15,7 @@ mod number_tool;
 mod order_book;
 mod order_matcher;
 mod test_order_book_builder;
-use broadcast_handler::TradeNetworkTime;
+use broadcast_handler::OrderExecutionNetworkTime;
 use data_types::{EngineState, IncomingMessage, MatchResult};
 
 use network_handler::NetworkHandler;
@@ -206,16 +206,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Configuration Loaded:");
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
-    println!("  Trade Multicast: {}", trade_addr);
+    println!("  OrderExecution Multicast: {}", trade_addr);
     println!("  Status Multicast: {}", status_addr);
     println!("--------------------------------------------------");
 
     // 2. Initialize Sockets and JOIN Multicast Group
 
-    // --- 修改点 A：为输入套接字（接收 Trade）加入组播组 ---
+    // --- 修改点 A：为输入套接字（接收 OrderExecution）加入组播组 ---
     let trade_ip = match trade_addr.ip() {
         IpAddr::V4(ip) => ip,
-        _ => return Err("Trade multicast must be IPv4".into()),
+        _ => return Err("OrderExecution multicast must be IPv4".into()),
     };
     let input_socket = setup_multicast_socket(trade_addr.port(), trade_ip).await?;
     let shared_input_socket = Arc::new(input_socket);
@@ -253,7 +253,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         engine_state.clone(),
     );
     let mut order_matcher = OrderMatcher::new(message_rx, match_tx, engine_state.clone());
-    let mut broadcast_handler = TradeNetworkTime::new(
+    let mut broadcast_handler = OrderExecutionNetworkTime::new(
         shared_broadcast_socket.clone(),
         engine_state.status_multicast_addr,
         match_rx,

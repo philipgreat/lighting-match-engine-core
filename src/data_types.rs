@@ -5,7 +5,7 @@ use tokio::sync::RwLock;
 
 pub const MSG_ORDER_SUBMIT: u8 = 1; // Client -> Engine: Order submission
 pub const MSG_ORDER_CANCEL: u8 = 2; // Client -> Engine: Order cancellation
-pub const MSG_TRADE_BROADCAST: u8 = 10; // Engine -> Client: Trade broadcast
+pub const MSG_TRADE_BROADCAST: u8 = 10; // Engine -> Client: OrderExecution broadcast
 pub const MSG_STATUS_BROADCAST: u8 = 11; // Engine -> Client: Status broadcast
 
 // --- Order Type Constants ---
@@ -60,8 +60,8 @@ pub struct CancelOrder {
 pub struct BroadcastStats {
     pub instance_tag: [u8; 16],      // 8-byte engine instance tag
     pub product_id: u16,            // Product identifier (2 bytes)
-    pub bids_size: u32,             // Current order book size (4 bytes)
-    pub ask_size: u32,              // Current order book size (4 bytes)
+    pub bids_order_count: u32,             // Current order book size (4 bytes)
+    pub ask_order_count: u32,              // Current order book size (4 bytes)
     pub matched_orders: u32,        // Total matched orders count (4 bytes)
     pub total_received_orders: u32, // Total received orders count (4 bytes)
     pub start_time: u64,            // Program start time (Nanoseconds) (8 bytes)
@@ -70,20 +70,20 @@ pub struct BroadcastStats {
 
 // Match Result Structure (for MSG_TRADE_BROADCAST)
 #[derive(Debug, Clone)]
-pub struct Trade {
+pub struct OrderExecution {
     pub instance_tag: [u8; 16],    // 16-byte engine instance tag
     pub product_id: u16,          // Product identifier (2 bytes)
     pub buy_order_id: u64,        // Buyer's order ID (8 bytes)
     pub sell_order_id: u64,       // Seller's order ID (8 bytes)
-    pub price: u64,               // Trade price (8 bytes)
-    pub quantity: u32,            // Trade quantity (4 bytes)
-    pub trade_time_network: u32,  // Trade timestamp (Nanoseconds) (4 bytes)
+    pub price: u64,               // OrderExecution price (8 bytes)
+    pub quantity: u32,            // OrderExecution quantity (4 bytes)
+    pub trade_time_network: u32,  // OrderExecution timestamp (Nanoseconds) (4 bytes)
     pub internal_match_time: u32, // Total Payload Size: 46 bytes
     pub is_mocked_result: bool,
 }
 #[derive(Debug, Clone)]
 pub struct MatchResult {
-    pub trade_list:Vec<Trade>,
+    pub order_execution_ist:Vec<OrderExecution>,
     pub start_time: u64,
     pub end_time: u64,
     

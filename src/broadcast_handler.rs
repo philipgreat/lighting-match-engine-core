@@ -8,14 +8,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 /// Handler responsible for sending out matched trade results.
-pub struct TradeNetworkTime {
+pub struct OrderExecutionNetworkTime {
     socket: Arc<UdpSocket>,
     trade_multicast_addr: SocketAddr,
     receiver: Receiver<MatchResult>,
     state: Arc<EngineState>,
 }
 
-impl TradeNetworkTime {
+impl OrderExecutionNetworkTime {
     /// Creates a new trade_network_time.
     pub fn new(
         socket: Arc<UdpSocket>,
@@ -23,7 +23,7 @@ impl TradeNetworkTime {
         receiver: Receiver<MatchResult>,
         state: Arc<EngineState>,
     ) -> Self {
-        TradeNetworkTime {
+        OrderExecutionNetworkTime {
             socket,
             trade_multicast_addr,
             receiver,
@@ -31,14 +31,14 @@ impl TradeNetworkTime {
         }
     }
 
-    /// Runs the main loop to listen for Trades and broadcast them.
+    /// Runs the main loop to listen for OrderExecutions and broadcast them.
     pub async fn run_broadcast_loop(&mut self) {
         println!(
-            "Trade broadcaster started. Target address: {}",
+            "OrderExecution broadcaster started. Target address: {}",
             self.trade_multicast_addr
         );
         while let Some(result) = self.receiver.recv().await {
-            // Serialize the Trade into the fixed 50-byte buffer
+            // Serialize the OrderExecution into the fixed 50-byte buffer
             //
             let mut match_orders = self.state.matched_orders.write().await;
             //println!("deserialize_order");
