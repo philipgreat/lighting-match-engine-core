@@ -106,6 +106,13 @@ pub trait ResultSender: Send + Sync {
     fn send_result(&self, result: MatchResult);
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct MatchedRestingOrder {
+    pub order_index: OrderIndex, // Index in the bids or asks vector
+    pub matched_quantity: u32,   // Quantity matched from this resting order
+    pub is_buy: bool,            // true if the order is from the bids array (buy side)
+}
+
 #[derive(Debug)]
 // The core Order Book structure (T in Vec<T>)
 // This implements the layered indexing (Price-Time Priority).
@@ -125,6 +132,11 @@ pub struct OrderBook {
 
     pub bids_index_used: usize,
     pub asks_index_used: usize,
+
+    pub matched_orders: Vec<MatchedRestingOrder>,
+    pub bids_to_remove: Vec<OrderIndex>,
+    pub asks_to_remove: Vec<OrderIndex>,
+    pub match_result:MatchResult,
 }
 
 // Engine State and Context

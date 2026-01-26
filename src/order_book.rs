@@ -5,19 +5,14 @@ use crate::high_resolution_timer::HighResolutionCounter;
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
     Trade, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_SELL,
-    Order, OrderBook, OrderIndex,MatchResult
+    Order, OrderBook, OrderIndex,MatchResult,MatchedRestingOrder
 };
 
 // --- Helper Structs and Trait ---
 
 /// A temporary structure to hold the information of the resting order involved in a match
 /// so that it can be processed in post_match (e.g., deletion or quantity update).
-#[derive(Debug, Clone, Copy)]
-pub struct MatchedRestingOrder {
-    pub order_index: OrderIndex, // Index in the bids or asks vector
-    pub matched_quantity: u32,   // Quantity matched from this resting order
-    pub is_buy: bool,            // true if the order is from the bids array (buy side)
-}
+
 
 /// The core trait for sending match results (trade signals) to an external system.
 /// The implementation will be external to this file.
@@ -83,6 +78,13 @@ impl OrderBook {
 
             bids_index_used: 0,
             asks_index_used: 0,
+
+            matched_orders: Vec::with_capacity(initial_top_size as usize),
+            bids_to_remove: Vec::with_capacity(initial_top_size as usize ),
+            asks_to_remove: Vec::with_capacity(initial_top_size as usize ),
+            match_result: MatchResult::new(initial_top_size as usize),
+
+            
         }
     }
 
@@ -216,28 +218,22 @@ impl OrderBook {
         sender: &T,
     ) -> Vec<MatchedRestingOrder> {
         //println!("entering match_order");
-        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(200);
+        //let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(200);
 
         if new_order.order_type == ORDER_TYPE_SELL {
             // New order is a SELL, match against Bids (BUY side)
-            matched_orders.extend(
-                self.match_against_side(
+           self.match_against_side(
                     &mut new_order,
                     false, // match against BUY side
                     sender,
-                )
-                .await,
-            );
+                );
         } else if new_order.order_type == ORDER_TYPE_BUY {
             // New order is a BUY, match against Asks (SELL side)
-            matched_orders.extend(
-                self.match_against_side(
+            self.match_against_side(
                     &mut new_order,
                     true, // match against SELL side
                     sender,
-                )
-                .await,
-            );
+                );
         }
         //println!("entering match_order order type {:?}", new_order);
         // Handle the residual new order for LIMIT types
@@ -247,24 +243,24 @@ impl OrderBook {
         }
 
         //println!("get a new matched_orders {:?}", matched_orders.clone());
-        matched_orders
+        self.matched_orders.clone()
     }
 
     /// Internal function to match a new order against one side (Bids or Asks). (async)
     ///
-    async fn match_against_side<T: ResultSender>(
+    fn match_against_side<T: ResultSender>(
         &mut self,
         new_order: &mut Order,
         match_against_asks: bool,
         sender: &T,
-    ) -> Vec<MatchedRestingOrder> {
-        let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(200);
+    ) {
+        //let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(200);
         let engine_received_time = current_timestamp();
         let timer = HighResolutionCounter::start(28*100_000_000);
-        let mut match_result = MatchResult::new(200);
-
+        //let mut match_result = MatchResult::new(200);
+        self.match_result.trade_list.clear();
         let start_time = timer.ns();
-        match_result.start_time = start_time as u64;
+        self.match_result.start_time = start_time as u64;
         
         loop {
             
@@ -368,7 +364,7 @@ impl OrderBook {
             new_order.quantity -= trade_quantity;
 
             // Record the matched resting order for post_match cleanup
-            matched_orders.push(MatchedRestingOrder {
+            self.matched_orders.push(MatchedRestingOrder {
                 order_index: resting_order_index,
                 matched_quantity: trade_quantity,
                 is_buy: !match_against_asks,
@@ -402,7 +398,7 @@ impl OrderBook {
                 internal_match_time: 0,
                 is_mocked_result: new_order.is_mocked_order,
             };
-            match_result.add_trade(single_trade);
+            self.match_result.add_trade(single_trade);
             //sender.send_result(single_trade);
 
             let needs_to_rebuild_index = if match_against_asks {
@@ -412,48 +408,47 @@ impl OrderBook {
             };
 
             if needs_to_rebuild_index {
-                self.post_match(matched_orders.clone(),match_against_asks);
-                matched_orders.clear();
+                self.post_match(match_against_asks);
+                
             }
 
             // Loop continues to check if more orders can be matched.
         }
-        let result = matched_orders.clone();
+        //let result = self.matched_orders.clone();
         
         let end_time = timer.ns();
-        match_result.end_time =end_time as u64;
+        self.match_result.end_time = end_time as u64;
         
             
-        sender.send_result(match_result);
-            
-        self.post_match(matched_orders,match_against_asks);
+        sender.send_result(self.match_result.clone());
+        
+        self.post_match(match_against_asks);
+
 
         
 
-        result
+        
     }
 
     // --- Phase 4: Post Match Processing ---
 
     /// Cleans up the order book after a match, deleting/updating resting orders, and rebuilding indices. (async)
-    pub fn post_match(&mut self, matched_orders: Vec<MatchedRestingOrder>,match_against_asks:bool) {
+    pub fn post_match(&mut self,match_against_asks:bool) {
         //println!(" orders matched {}", matched_orders.len());
 
-        if matched_orders.is_empty() {
-            println!("no order to execute post match");
+        if self.matched_orders.is_empty() {
+            //println!("no order to execute post match");
             return;
         }
 
-        let mut bids_to_remove: Vec<OrderIndex> = Vec::with_capacity(200);
-        let mut asks_to_remove: Vec<OrderIndex> = Vec::with_capacity(200);
 
         // Acquire write locks for both bids and asks vectors
 
         // 1 & 2. Process and mark for removal/update
-        for matched in matched_orders {
+        for matched in &self.matched_orders {
             if matched.is_buy {
                 // For buy orders, use bids and bids_to_remove
-                let (orders_vec, to_remove_list) = (&mut self.bids, &mut bids_to_remove);
+                let (orders_vec, to_remove_list) = (&mut self.bids, &mut self.bids_to_remove);
 
                 if let Some(order) = orders_vec.get_mut(matched.order_index as usize) {
                     if matched.matched_quantity >= order.quantity {
@@ -466,7 +461,7 @@ impl OrderBook {
                 }
             } else {
                 // For sell orders, use asks and asks_to_remove
-                let (orders_vec, to_remove_list) = (&mut self.asks, &mut asks_to_remove);
+                let (orders_vec, to_remove_list) = (&mut self.asks, &mut self.asks_to_remove);
 
                 if let Some(order) = orders_vec.get_mut(matched.order_index as usize) {
                     if matched.matched_quantity >= order.quantity {
@@ -483,20 +478,26 @@ impl OrderBook {
         // 2. Remove fully matched orders (must be done in descending index order for safe removal)
 
         // Remove from Bids
-        bids_to_remove.sort_by(|a, b| b.cmp(a));
-        for index in bids_to_remove {
-            if (index as usize) < self.bids.len() {
-                self.bids.remove(index as usize);
+        self.bids_to_remove.sort_unstable_by(|a, b| b.cmp(a));
+        self.bids_to_remove.dedup();
+
+        for &index in &self.bids_to_remove {
+            if index < self.bids.len() as u32{
+                self.bids.swap_remove(index as usize);
             }
         }
+        self.bids_to_remove.clear();
 
         // Remove from Asks
-        asks_to_remove.sort_by(|a, b| b.cmp(a));
-        for index in asks_to_remove {
-            if (index as usize) < self.asks.len() {
+        self.asks_to_remove.sort_unstable_by(|a, b| b.cmp(a));
+        self.asks_to_remove.dedup();
+
+        for &index in self.asks_to_remove.iter() {
+            if index < self.asks.len() as u32 {
                 self.asks.remove(index as usize);
             }
         }
+        self.asks_to_remove.clear();
 
         // Release order vector locks before rebuilding indices
 
@@ -506,7 +507,7 @@ impl OrderBook {
         }else{
             self.prepare_bids_index();
         }
-       
+        self.matched_orders.clear();
         
     }
 
