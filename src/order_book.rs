@@ -54,11 +54,14 @@ impl MatchResult {
      pub fn total_count(& self)->u32{
         self.order_execution_ist.len() as u32
      }
-     pub fn total_time(self)-> u64{
+     pub fn total_time(& self)-> u64{
        self.end_time - self.start_time
      }
      pub fn time_per_trade(&self)->u32{
-        ((self.end_time-self.start_time) / self.total_count() as u64) as u32
+        if self.total_count() == 0 {
+            return 0
+        }
+        (self.total_time() / self.total_count() as u64) as u32
      }
      
 
