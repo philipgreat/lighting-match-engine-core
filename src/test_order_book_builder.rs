@@ -27,11 +27,11 @@ impl TestOrderBookBuilder {
         
         for i in 0..self.test_order_book_size {
             let order = self.create_buy_order(i);
-            order_book.fuel_order(order).await;
+            order_book.fuel_order(order);
         }
         for i in 0..self.test_order_book_size {
             let order = self.create_sell_order(i, self.test_order_book_size);
-            order_book.fuel_order(order).await;
+            order_book.fuel_order(order);
         }
         order_book.prepare_index();
     }

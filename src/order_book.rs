@@ -94,7 +94,7 @@ impl OrderBook {
     // --- Phase 1: Fuel Order (Adding orders) ---
 
     /// Adds an order to the order book (bids or asks).
-    pub async fn fuel_order(&mut self, order: Order) {
+    pub fn fuel_order(&mut self, order: Order) {
         if order.order_type == ORDER_TYPE_BUY {
             // Acquire a write lock asynchronously
             // In a real system, insert the order while maintaining price/time priority.
@@ -222,7 +222,7 @@ impl OrderBook {
     ) -> Vec<MatchedRestingOrder> {
         //println!("entering match_order");
         //let mut matched_orders: Vec<MatchedRestingOrder> = Vec::with_capacity(200);
-
+        let mut match_agaist_asks = false;
         if new_order.order_type == ORDER_TYPE_SELL {
             // New order is a SELL, match against Bids (BUY side)
            self.match_against_side(
@@ -232,6 +232,7 @@ impl OrderBook {
                 );
         } else if new_order.order_type == ORDER_TYPE_BUY {
             // New order is a BUY, match against Asks (SELL side)
+            match_agaist_asks = true;
             self.match_against_side(
                     &mut new_order,
                     true, // match against SELL side
@@ -242,7 +243,14 @@ impl OrderBook {
         // Handle the residual new order for LIMIT types
         if new_order.quantity > 0 && new_order.price_type == ORDER_PRICE_TYPE_LIMIT {
             // Unfilled limit order is now resting, add it to the book
-            self.fuel_order(new_order).await;
+            self.fuel_order(new_order);
+            
+            if match_agaist_asks  {
+                self.prepare_bids_index();
+            } else {
+                self.prepare_asks_index();
+            }
+            
         }
 
         //println!("get a new matched_orders {:?}", matched_orders.clone());
