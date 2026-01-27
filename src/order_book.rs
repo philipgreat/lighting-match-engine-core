@@ -1,4 +1,6 @@
 
+use std::thread::sleep;
+
 use crate::date_time_tool::current_timestamp;
 use crate::high_resolution_timer::HighResolutionCounter;
 // Assuming these are defined in data_types.rs
@@ -45,14 +47,14 @@ impl MatchResult {
         MatchResult {
             start_time:0,
             end_time:0,
-            order_execution_ist: Vec::with_capacity(init_trade_size),
+            order_execution_list: Vec::with_capacity(init_trade_size),
         }
      }
      pub fn add_order_execution(&mut self,trade: OrderExecution){
-        self.order_execution_ist.push(trade);
+        self.order_execution_list.push(trade);
      }
      pub fn total_count(& self)->u32{
-        self.order_execution_ist.len() as u32
+        self.order_execution_list.len() as u32
      }
      pub fn total_time(& self)-> u64{
        self.end_time - self.start_time
@@ -82,12 +84,15 @@ impl OrderBook {
             bids_index_used: 0,
             asks_index_used: 0,
 
+            total_ask_volumn: 0,
+            total_bid_volumn: 0,
+
             matched_orders: Vec::with_capacity(initial_top_size as usize),
             bids_to_remove: Vec::with_capacity(initial_top_size as usize ),
             asks_to_remove: Vec::with_capacity(initial_top_size as usize ),
+            
             match_result: MatchResult::new(initial_top_size as usize),
 
-            
         }
     }
 
@@ -211,6 +216,43 @@ impl OrderBook {
         self.prepare_bids_index();
         self.prepare_asks_index();
     }
+    pub fn update_stats(&mut self){
+
+        self.total_ask_volumn = self.asks.iter().map(|item| item.quantity).sum();
+        self.total_bid_volumn = self.bids.iter().map(|item| item.quantity).sum();
+    }
+    // when match ends, call the func to update stats data
+    pub fn update_stats_with_result(&mut self, new_order:&Order){
+
+        let is_sell_order = if new_order.order_type == ORDER_TYPE_SELL {
+            true
+        }else {
+            false
+        };
+
+        if is_sell_order && new_order.quantity > 0{
+            self.total_ask_volumn += new_order.quantity            
+        }else {
+            self.total_bid_volumn += new_order.quantity
+        }
+
+        if self.match_result.order_execution_list.is_empty() {
+            return
+        }
+
+        let total_quantity:u32 = 
+        self.match_result.order_execution_list.iter().map(|item|item.quantity).sum();
+
+        if is_sell_order {
+            self.total_bid_volumn -= total_quantity;
+        }else {            
+            self.total_ask_volumn -= total_quantity;
+        }
+
+        
+
+    }
+
 
     // --- Phase 3: Match Orders ---
 
@@ -250,8 +292,9 @@ impl OrderBook {
             } else {
                 self.prepare_asks_index();
             }
-            
+
         }
+        
 
         //println!("get a new matched_orders {:?}", matched_orders.clone());
         self.matched_orders.clone()
@@ -269,7 +312,7 @@ impl OrderBook {
         let engine_received_time = current_timestamp();
         let timer = HighResolutionCounter::start(28*100_000_000);
         //let mut match_result = MatchResult::new(200);
-        self.match_result.order_execution_ist.clear();
+        self.match_result.order_execution_list.clear();
         let start_time = timer.ns();
         self.match_result.start_time = start_time as u64;
         
@@ -434,8 +477,8 @@ impl OrderBook {
         sender.send_result(self.match_result.clone());
         
         self.post_match(match_against_asks);
-
-
+        self.update_stats_with_result(&new_order);
+        
         
 
         

@@ -130,7 +130,7 @@ pub fn serialize_match_result(result: &MatchResult) -> Vec<Vec<u8>> {
     let mut batches = Vec::new();
 
     let time_per_trade = result.time_per_trade();
-    for chunk in result.order_execution_ist.chunks(BATCH_SIZE) {
+    for chunk in result.order_execution_list.chunks(BATCH_SIZE) {
         let mut buf = Vec::with_capacity(MESSAGE_TOTAL_SIZE * chunk.len());
 
         for trade in chunk {
@@ -188,12 +188,18 @@ pub fn serialize_stats_result(stats: &BroadcastStats) -> [u8; MESSAGE_TOTAL_SIZE
     // 6. Start Time (u64)
     // Size: 8 bytes
     buf[current_idx..current_idx + 8].copy_from_slice(&stats.start_time.to_be_bytes());
-    //current_idx += 8; // Index: 32 (Last index written: 31)
+    current_idx += 8; // Index: 32 (Last index written: 31)
 
+    buf[current_idx..current_idx + 4].copy_from_slice(&stats.total_bid_volumn.to_be_bytes());
+    current_idx += 4; // Index: 32 (Last index written: 31)
+
+    buf[current_idx..current_idx + 4].copy_from_slice(&stats.total_ask_volumn.to_be_bytes());
+    //current_idx += 4; // Index: 32 (Last index written: 31)
+    
     // Checksum calculation and placement
     // Last data byte is at index 31. Padding goes from index 32 up to MESSAGE_TOTAL_SIZE - 1.
     buf[0] = calculate_checksum(&buf);
-
+    
     buf
 }
 

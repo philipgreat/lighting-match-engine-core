@@ -59,7 +59,7 @@ impl StatusBroadcaster {
             interval.tick().await;
 
             // 1. Lock necessary shared data
-            let order_book = self.state.order_book.clone();
+            let order_book = self.state.order_book.read().await;
             let matched_orders = self.state.matched_orders.read().await;
             let total_received_orders = self.state.total_received_orders.read().await;
 
@@ -67,14 +67,16 @@ impl StatusBroadcaster {
             let stats = BroadcastStats {
                 instance_tag: self.state.instance_tag,
                 product_id: self.state.product_id,
-                bids_order_count: order_book.read().await.bids.len() as u32,
-                ask_order_count: order_book.read().await.asks.len() as u32,
+                bids_order_count: order_book.bids.len() as u32,
+                ask_order_count: order_book.asks.len() as u32,
                 matched_orders: *matched_orders as u32,
                 total_received_orders: *total_received_orders as u32,
                 start_time: self.state.start_time,
+                total_bid_volumn: order_book.total_bid_volumn,
+                total_ask_volumn: order_book.total_ask_volumn,
             };
-            //println!("status info {:?}", stats);
-
+            println!("status info {:?}", stats);
+            
             // 3. Serialize and send
             let buf: [u8; MESSAGE_TOTAL_SIZE] = message_codec::serialize_stats_result(&stats);
             if let Err(e) = self.socket.send_to(&buf, addr).await {

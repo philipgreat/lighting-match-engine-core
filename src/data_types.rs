@@ -58,7 +58,7 @@ pub struct CancelOrder {
 // Broadcast Status Structure (for MSG_STATUS_BROADCAST)
 #[derive(Debug, Clone)]
 pub struct BroadcastStats {
-    pub instance_tag: [u8; 16],      // 8-byte engine instance tag
+    pub instance_tag: [u8; 16],      // 16-byte engine instance tag
     pub product_id: u16,            // Product identifier (2 bytes)
     pub bids_order_count: u32,             // Current order book size (4 bytes)
     pub ask_order_count: u32,              // Current order book size (4 bytes)
@@ -66,6 +66,9 @@ pub struct BroadcastStats {
     pub total_received_orders: u32, // Total received orders count (4 bytes)
     pub start_time: u64,            // Program start time (Nanoseconds) (8 bytes)
                                     // Total Payload Size: 42 bytes
+    pub total_bid_volumn: u32,
+    pub total_ask_volumn: u32,
+    
 }
 
 // Match Result Structure (for MSG_TRADE_BROADCAST)
@@ -83,7 +86,7 @@ pub struct OrderExecution {
 }
 #[derive(Debug, Clone)]
 pub struct MatchResult {
-    pub order_execution_ist:Vec<OrderExecution>,
+    pub order_execution_list:Vec<OrderExecution>,
     pub start_time: u64,
     pub end_time: u64,
     
@@ -137,6 +140,9 @@ pub struct OrderBook {
     pub bids_to_remove: Vec<OrderIndex>,
     pub asks_to_remove: Vec<OrderIndex>,
     pub match_result:MatchResult,
+
+    pub total_ask_volumn: u32,
+    pub total_bid_volumn: u32,
 }
 
 // Engine State and Context

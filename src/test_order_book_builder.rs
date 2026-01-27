@@ -34,6 +34,7 @@ impl TestOrderBookBuilder {
             order_book.fuel_order(order);
         }
         order_book.prepare_index();
+        order_book.update_stats();
     }
     pub fn create_buy_order(&self, index: u32) -> Order {
         //let time_now = time::Instant::now().elapsed().as_nanos() as u64;
