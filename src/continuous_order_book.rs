@@ -7,7 +7,7 @@ use crate::high_resolution_timer::HighResolutionCounter;
 // NOTE: In a real Rust project, you'd replace 'crate::data_types' with the actual path.
 use crate::data_types::{
     OrderExecution, ORDER_PRICE_TYPE_LIMIT, ORDER_PRICE_TYPE_MARKET, ORDER_TYPE_BUY, ORDER_TYPE_SELL,
-    Order, OrderBook, OrderIndex,MatchResult,MatchedRestingOrder
+    Order, ContinuousOrderBook, OrderIndex,MatchResult,MatchedRestingOrder
 };
 
 // --- Helper Structs and Trait ---
@@ -24,9 +24,9 @@ pub trait ResultSender: Send {
     
 }
 
-// --- OrderBook Definition ---
+// --- ContinuousOrderBook Definition ---
 
-// pub struct OrderBook {
+// pub struct ContinuousOrderBook {
 //     // Orders on the buy side (bids)
 //     pub bids: RwLock<Vec<Order>>,
 //     // Orders on the sell side (asks)
@@ -66,12 +66,12 @@ impl MatchResult {
         (self.total_time() / self.total_count() as u64) as u32
      }
      
-
+     
 }
-impl OrderBook {
-    /// Constructs a new OrderBook with specified initial capacities.
+impl ContinuousOrderBook {
+    /// Constructs a new ContinuousOrderBook with specified initial capacities.
     pub fn new(initial_book_size: u32, initial_top_size: u32) -> Self {
-        OrderBook {
+        ContinuousOrderBook {
             bids: Vec::with_capacity(initial_book_size as usize),
             asks: Vec::with_capacity(initial_book_size as usize),
 
@@ -101,12 +101,8 @@ impl OrderBook {
     /// Adds an order to the order book (bids or asks).
     pub fn fuel_order(&mut self, order: Order) {
         if order.order_type == ORDER_TYPE_BUY {
-            // Acquire a write lock asynchronously
-            // In a real system, insert the order while maintaining price/time priority.
             self.bids.push(order);
         } else if order.order_type == ORDER_TYPE_SELL {
-            // Acquire a write lock asynchronously
-            // In a real system, insert the order while maintaining price/time priority.
             self.asks.push(order);
         }
     }

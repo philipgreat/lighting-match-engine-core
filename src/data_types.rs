@@ -120,7 +120,7 @@ pub struct MatchedRestingOrder {
 // The core Order Book structure (T in Vec<T>)
 // This implements the layered indexing (Price-Time Priority).
 
-pub struct OrderBook {
+pub struct ContinuousOrderBook {
     // Vectors to hold the actual orders. Bids: best to worst. Asks: best to worst.
     pub bids: Vec<Order>,
     pub asks: Vec<Order>,
@@ -151,10 +151,17 @@ pub struct EngineState {
     pub instance_tag: [u8; 16],
     pub product_id: u16,
     // Order Book
-    pub order_book: Arc<RwLock<OrderBook>>,
+    pub continuous_order_book: Arc<RwLock<ContinuousOrderBook>>,
+    pub call_auction_pool:  Arc<RwLock<CallAuctionPool>>,
     // Counters
     pub matched_orders: std::sync::Arc<RwLock<u64>>,
     pub total_received_orders: std::sync::Arc<RwLock<u64>>,
     pub start_time: u64, // Nanoseconds
     pub status_multicast_addr: std::net::SocketAddr,
+}
+
+#[derive(Debug)]
+pub struct CallAuctionPool {
+    pub bids: Vec<Order>,
+    pub asks: Vec<Order>,
 }

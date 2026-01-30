@@ -1,7 +1,7 @@
 use crate::data_types::{
     EngineState, IncomingMessage, OrderExecution, Order,MatchResult,
 };
-use crate::order_book::ResultSender;
+use crate::continuous_order_book::ResultSender;
 
 use std::sync::Arc;
 
@@ -52,16 +52,16 @@ impl OrderMatcher {
             return;
         }
 
-        let mut order_book = self.state.order_book.write().await;
+        let mut continuous_order_book = self.state.continuous_order_book.write().await;
         //println!("get a new order after await");
-        order_book.match_order(new_order, self).await;
+        continuous_order_book.match_order(new_order, self).await;
 
-        //order_book.match_order(new_order, sender)
+        //continuous_order_book.match_order(new_order, sender)
         // 1. Pre-matching clean-up: Remove expired orders
-        //self.cleanup_expired_orders(new_order.clone(), &mut order_book);
+        //self.cleanup_expired_orders(new_order.clone(), &mut continuous_order_book);
         // println!(
         //     "==========> --tag in book: {:?}",
-        //     order_book.len()
+        //     continuous_order_book.len()
         // );
 
         // 2. Execute matching
@@ -72,9 +72,9 @@ impl OrderMatcher {
 
     /// Handles order cancellation by removing the matching order from the book.
     async fn handle_order_cancellation(&self, order_id_to_cancel: u64) {
-        let order_book = self.state.order_book.clone();
+        let continuous_order_book = self.state.continuous_order_book.clone();
 
-        let mut book = order_book.write().await;
+        let mut book = continuous_order_book.write().await;
         book.cancel_order(order_id_to_cancel).await;
     }
 }
