@@ -150,7 +150,6 @@ impl ContinuousOrderBook {
                 .then_with(|| a.2.cmp(&b.2))
         });
 
-        //let mut top_bids_index_guard = self.top_bids_index.write().await;
         self.top_bids_index.clear();
         self.bids_index_used = 0;
 
@@ -195,7 +194,6 @@ impl ContinuousOrderBook {
         });
 
         // 4. Acquire write lock for top_asks_index
-        //let mut top_asks_index_guard = self.top_asks_index.write().await;
         self.top_asks_index.clear();
         self.asks_index_used = 0;
         // 5. Take the first N indices (top orders)
@@ -448,7 +446,7 @@ impl ContinuousOrderBook {
                 internal_match_time: 0,
                 is_mocked_result: new_order.is_mocked_order(),
             };
-            
+
             self.match_result.add_order_execution(order_execution);
             //sender.send_result(order_execution);
 

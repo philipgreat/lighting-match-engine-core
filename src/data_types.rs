@@ -1,7 +1,6 @@
 // --- Message Type Constants ---
 
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 pub const MSG_ORDER_SUBMIT: u8 = 1; // Client -> Engine: Order submission
 pub const MSG_ORDER_CANCEL: u8 = 2; // Client -> Engine: Order cancellation
@@ -16,13 +15,11 @@ pub const ORDER_TYPE_MOCK_BUY: u8 = 3; // Order side: mock buy
 pub const ORDER_TYPE_MOCK_SELL: u8 = 4; // Order side: mock sell
 
 
-
 pub const ORDER_PRICE_TYPE_LIMIT: u8 = 1; // Order price type: Limit
 pub const ORDER_PRICE_TYPE_MARKET: u8 = 2; // Order price type: Market
 
 pub const TRADE_TYPE_REAL: u8 = 0; // Order price type: Limit
 pub const TRADE_TYPE_MOCK: u8 = 1; // Order price type: Market
-
 
 
 // --- Message Size Constant ---
@@ -153,13 +150,12 @@ pub struct EngineState {
     pub instance_tag: [u8; 16],
     pub product_id: u16,
     // Order Book
-    pub continuous_order_book: Arc<RwLock<ContinuousOrderBook>>,
-    pub call_auction_pool:  Arc<RwLock<CallAuctionPool>>,
+    pub continuous_order_book: ContinuousOrderBook,
+    pub call_auction_pool:  CallAuctionPool,
     // Counters
-    pub matched_orders: std::sync::Arc<RwLock<u64>>,
-    pub total_received_orders: std::sync::Arc<RwLock<u64>>,
+    pub matched_orders: u64,
+    pub total_received_orders: u64,
     pub start_time: u64, // Nanoseconds
-    pub status_multicast_addr: std::net::SocketAddr,
 }
 
 #[derive(Debug)]
@@ -176,3 +172,4 @@ impl Order{
     }
 
 }
+

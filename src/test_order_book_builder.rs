@@ -8,34 +8,34 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Handler responsible for receiving incoming network messages (Orders/Cancels).
 pub struct TestOrderBookBuilder {
-    test_order_book_size: u32,
-    state: Arc<EngineState>,
+    test_order_book_size: u32
 }
 
 impl TestOrderBookBuilder {
     /// Creates a new NetworkHandler.
-    pub fn new(test_order_book_size: u32, state: Arc<EngineState>) -> Self {
+    pub fn new(test_order_book_size: u32) -> Self {
         TestOrderBookBuilder {
             test_order_book_size,
-            state,
+           
         }
     }
 
     /// Runs the main loop to receive and process UDP messages.
-    pub async fn start_run(&mut self) {
-        let mut continuous_order_book = self.state.continuous_order_book.write().await;
+    pub  fn start_run(&self, mut engine: EngineState) {
         
         for i in 0..self.test_order_book_size {
             let order = self.create_buy_order(i);
-            continuous_order_book.fuel_order(order);
+            engine.continuous_order_book.fuel_order(order);
         }
         for i in 0..self.test_order_book_size {
             let order = self.create_sell_order(i, self.test_order_book_size);
-            continuous_order_book.fuel_order(order);
+            engine.continuous_order_book.fuel_order(order);
         }
-        continuous_order_book.prepare_index();
-        continuous_order_book.update_stats();
+        engine.continuous_order_book.prepare_index();
+        engine.continuous_order_book.update_stats();
     }
+
+
     pub fn create_buy_order(&self, index: u32) -> Order {
         //let time_now = time::Instant::now().elapsed().as_nanos() as u64;
         let time_now = SystemTime::now()
@@ -43,7 +43,7 @@ impl TestOrderBookBuilder {
             .expect("fail")
             .as_nanos() as u64;
         Order {
-            product_id: self.state.product_id,
+            product_id: 7,
             order_id: (index + 1) as u64,
             order_type: ORDER_TYPE_BUY,
             price_type: ORDER_PRICE_TYPE_LIMIT,
@@ -61,7 +61,7 @@ impl TestOrderBookBuilder {
             .as_nanos() as u64;
 
         Order {
-            product_id: self.state.product_id,
+            product_id: 7,
             order_id: (size + index + 1) as u64,
             order_type: ORDER_TYPE_SELL,
             price_type: ORDER_PRICE_TYPE_LIMIT,
