@@ -116,6 +116,30 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     tag_array
 }
 
+fn show_result(result:MatchResult){
+
+
+    let time_per_order_execution = result.total_time() as usize / result.order_execution_list.len();
+
+    result
+    .order_execution_list
+    .iter()
+    .map(|order_exec| {
+        format!(
+            "🔥 ORDER EXECUTION: Product={} | Price={} | Qty={} | BuyOrderID={} | SellOrderId={} | MatchLat={}ns",
+            order_exec.product_id,
+            order_exec.price,
+            order_exec.quantity,
+            order_exec.buy_order_id,
+            order_exec.sell_order_id,
+            time_per_order_execution
+        )
+    })
+    .for_each(|line| println!("{}", line));
+    
+
+}
+
  fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Lighting Match Engine Core...");
 
@@ -157,8 +181,8 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             order_type: ORDER_TYPE_BUY,
             price:100000000000,
             price_type: ORDER_PRICE_TYPE_LIMIT,
-            quantity:3,
-            order_id: i*1_000_000_000,
+            quantity:5,
+            order_id: 1_000_000_000+i,
             submit_time:100,
             expire_time:0,
 
@@ -185,12 +209,12 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
     }
     let end = timer.ns() as u64;
-    println!("time consumed {} ns", (end-start));
-    println!("speed {} per second ", ( (1_000_000_000)*(count ) ) /(end-start));
+    println!("Time consumed {} ns", (end-start));
+    println!("Speed: {} match results per second ", ( (1_000_000_000)*(count ) ) /(end-start));
 
-    println!("result {:?}", engine_state.continuous_order_book.match_result);
+    //println!("result {:?}", engine_state.continuous_order_book.match_result);
     
-    
+    show_result(engine_state.continuous_order_book.match_result);
     
     // println!("{:?} ns ",engine_state.continuous_order_book.match_result.total_time());
 
@@ -198,9 +222,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     //     println!("{:?}",oe);
     // });
 
-    println!("runs here {}", engine_state.continuous_order_book.asks.len());
-    println!("runs here {}", engine_state.continuous_order_book.bids.len());
-
+   
     Ok(())
 }
 
