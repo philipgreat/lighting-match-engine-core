@@ -45,7 +45,7 @@ impl TradeEventSender {
             *match_orders += result.total_count() as u64;
 
             let chunks = message_codec::serialize_match_result(&result);
-
+            
             for buf in chunks {
                 if let Err(e) = self.socket.send_to(&buf, self.trade_multicast_addr).await {
                     eprintln!("Error sending trade broadcast: {}", e);

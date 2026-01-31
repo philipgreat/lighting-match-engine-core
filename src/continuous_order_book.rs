@@ -446,8 +446,9 @@ impl ContinuousOrderBook {
                 quantity: trade_quantity,
                 trade_time_network: (engine_received_time - new_order.submit_time) as u32,
                 internal_match_time: 0,
-                is_mocked_result: new_order.is_mocked_order,
+                is_mocked_result: new_order.is_mocked_order(),
             };
+            
             self.match_result.add_order_execution(order_execution);
             //sender.send_result(order_execution);
 

@@ -51,7 +51,6 @@ impl TestOrderBookBuilder {
             quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
-            is_mocked_order:false,
         }
     }
 
@@ -70,7 +69,6 @@ impl TestOrderBookBuilder {
             quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
-            is_mocked_order:false,
         }
     }
 }
