@@ -160,8 +160,7 @@ fn show_result(result:MatchResult){
     println!("Configuration Loaded:");
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
-    println!("  Test order book size ID: {}", test_order_book_size);
-    
+    println!("  Test order book size: {} bids and {}  asks pectively", test_order_book_size, test_order_book_size);
     println!("--------------------------------------------------");
     
     // 3. Initialize Engine State
