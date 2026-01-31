@@ -161,7 +161,7 @@ fn show_result(result:MatchResult){
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
     println!("  Test order book size: {} bids and {}  asks pectively", test_order_book_size, test_order_book_size);
-    println!("--------------------------------------------------");
+    println!("\n============================================================\n");
     
     // 3. Initialize Engine State
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
@@ -205,11 +205,19 @@ fn show_result(result:MatchResult){
     }
     let end = timer.ns() as u64;
     println!("Time consumed {} ns for {} match request.", (end-start),2*count);
-    println!("Speed: {} match results per second.", ( (1_000_000_000)*(2*count ) ) /(end-start));
-
+    println!("Speed: {} match results per second.\n", ( (1_000_000_000)*(2*count ) ) /(end-start));
+    let last_result = engine_state.continuous_order_book.match_result;
     //println!("result {:?}", engine_state.continuous_order_book.match_result);
     println!("---------------------------Last match result----------------------");
-    show_result(engine_state.continuous_order_book.match_result);
+    if last_result.total_count()>0 {
+            println!("\nTotal time: {}ns for {} order executions, avarage {} ns per order execution\n", 
+        last_result.total_time(), 
+        last_result.total_count(),
+        last_result.total_time() / last_result.total_count() as u64);
+    }
+
+
+    show_result(last_result);
     println!("===================================================================");
     // println!("{:?} ns ",engine_state.continuous_order_book.match_result.total_time());
 
