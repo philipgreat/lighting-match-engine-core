@@ -1,10 +1,6 @@
 // --- Message Type Constants ---
 
 use std::sync::Arc;
-use ahash::AHashMap;
-use std::collections::VecDeque;
-
-use crate::high_resolution_timer::HighResolutionTimer;
 
 pub const MSG_ORDER_SUBMIT: u8 = 1; // Client -> Engine: Order submission
 pub const MSG_ORDER_CANCEL: u8 = 2; // Client -> Engine: Order cancellation
@@ -96,30 +92,7 @@ pub struct MatchResult {
 
 
 }
-impl MatchResult {
-    pub fn new(cap: usize) -> Self {
-        Self {
-            order_execution_list: Vec::with_capacity(cap),
-            start_time: 0,
-            end_time: 0,
-        }
-    }
-    pub fn add_order_execution(&mut self,trade: OrderExecution){
-        self.order_execution_list.push(trade);
-     }
-     pub fn total_count(& self)->u32{
-        self.order_execution_list.len() as u32
-     }
-     pub fn total_time(& self)-> u64{
-       self.end_time - self.start_time
-     }
-     pub fn time_per_trade(&self)->u32{
-        if self.total_count() == 0 {
-            return 0
-        }
-        (self.total_time() / self.total_count() as u64) as u32
-     }
-}
+
 // Enum to unify incoming messages from the network
 #[derive(Debug)]
 pub enum IncomingMessage {
@@ -135,8 +108,6 @@ pub trait ResultSender: Send + Sync {
     fn send_result(&self, result: MatchResult);
 }
 
-
-
 #[derive(Debug, Clone, Copy)]
 pub struct MatchedRestingOrder {
     pub order_index: OrderIndex, // Index in the bids or asks vector
@@ -144,39 +115,33 @@ pub struct MatchedRestingOrder {
     pub is_buy: bool,            // true if the order is from the bids array (buy side)
 }
 
-#[derive(Default, Clone,Debug)]
-pub struct OrdersBucket {
-    pub orders: VecDeque<Order>,
-}
-
-
+#[derive(Debug)]
 // The core Order Book structure (T in Vec<T>)
 // This implements the layered indexing (Price-Time Priority).
-#[derive(Debug)]
+
 pub struct ContinuousOrderBook {
-    // price ladders
-    pub bids: Vec<OrdersBucket>,
-    pub asks: Vec<OrdersBucket>,
+    // Vectors to hold the actual orders. Bids: best to worst. Asks: best to worst.
+    pub bids: Vec<Order>,
+    pub asks: Vec<Order>,
 
-    // best price pointers
-    pub best_bid: isize,
-    pub best_ask: isize,
+    // Vectors to hold the indices of the best orders.
+    pub top_bids_index: Vec<OrderIndex>,
+    pub top_asks_index: Vec<OrderIndex>,
 
-    // price mapping
-    pub tick: u64,
-    pub base_price: u64,
-    pub levels: usize,
+    // Configuration
+    pub init_order_book_size: u32,
+    pub init_top_index_size: u32,
 
-    // order_id → (is_buy, price_index)
-    pub order_map: AHashMap<u64, (bool, usize)>,
+    pub bids_index_used: usize,
+    pub asks_index_used: usize,
 
-    // stats
-    pub total_bid_volumn: u32,
+    pub matched_orders: Vec<MatchedRestingOrder>,
+    pub bids_to_remove: Vec<OrderIndex>,
+    pub asks_to_remove: Vec<OrderIndex>,
+    pub match_result:MatchResult,
+
     pub total_ask_volumn: u32,
-
-    pub match_result: MatchResult,
-
-    pub timer: HighResolutionTimer,
+    pub total_bid_volumn: u32,
 }
 
 // Engine State and Context
@@ -200,24 +165,11 @@ pub struct CallAuctionPool {
 }
 
 
+impl Order{
 
-
-impl Order {
-    #[inline(always)]
-    pub fn is_buy(&self) -> bool {
-        self.order_type == ORDER_TYPE_BUY || self.order_type == ORDER_TYPE_MOCK_BUY
-    }
-
-    #[inline(always)]
-    pub fn is_sell(&self) -> bool {
-        self.order_type == ORDER_TYPE_SELL || self.order_type == ORDER_TYPE_MOCK_SELL
-    }
-
-    #[inline(always)]
-    pub fn is_mocked_order(&self) -> bool {
+    pub fn is_mocked_order(&self)->bool{
         self.order_type > 2
     }
+
 }
-
-
 

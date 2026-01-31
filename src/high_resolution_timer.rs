@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant};
+
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use core::arch::x86_64::{_rdtsc, _mm_lfence};
@@ -9,13 +9,14 @@ use core::arch::x86_64::{_rdtsc, _mm_lfence};
 /// • x86_64 (Linux/Mac): Uses fenced `rdtsc` for precision
 /// • ARM64 (Apple Silicon): Uses `cntvct_el0` (Fixed 24MHz)
 /// • Others: Falls back to `Instant::now()`
-pub struct HighResolutionCounter {
+#[derive(Debug)]
+pub struct HighResolutionTimer {
     start_cycles: u64,
-    start_time: Instant,
+    start_time: u64,
     tick_hz: u64,
 }
 
-impl HighResolutionCounter {
+impl HighResolutionTimer {
     /// Start the timer.
     /// - On Apple Silicon: tick_ghz is ignored (internally uses 0.024)
     /// - On Linux/x86: Pass the calibrated TSC frequency (e.g., 2.4)
@@ -24,7 +25,7 @@ impl HighResolutionCounter {
 
         Self {
             start_cycles,
-            start_time: Instant::now(),
+            start_time: 0,
             tick_hz,
         }
     }
@@ -82,6 +83,5 @@ impl HighResolutionCounter {
     
     pub fn us(&self) -> f64 { self.ns() as f64 / 1_000.0 }
     pub fn ms(&self) -> f64 { self.ns() as f64 / 1_000_000.0 }
-    pub fn duration(&self) -> Duration { Duration::from_nanos(self.ns() as u64) }
 }
 

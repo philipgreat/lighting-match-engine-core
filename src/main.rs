@@ -1,6 +1,4 @@
-use std::io;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs}; // <-- 增加 IpAddr
-use std::sync::Arc;
+
 
 mod data_types;
 mod date_time_tool;
@@ -12,9 +10,13 @@ mod continuous_order_book;
 mod call_auction_pool;
 
 
-use data_types::{EngineState, IncomingMessage, MatchResult};
+use data_types::{EngineState,ORDER_TYPE_BUY, 
+    ORDER_TYPE_SELL,
+    ORDER_PRICE_TYPE_LIMIT, MatchResult};
 
 use number_tool::parse_human_readable_u32;
+
+use crate::{data_types::Order, date_time_tool::current_timestamp, high_resolution_timer::HighResolutionTimer};
 
 // use tokio_console::ConsoleLayer;
 /// `listen_port`: 组播地址的端口 (例如 5000)
@@ -134,14 +136,72 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     println!("Configuration Loaded:");
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
+    println!("  Test order book size ID: {}", test_order_book_size);
+    
     println!("--------------------------------------------------");
     
     // 3. Initialize Engine State
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
+    engine_state.load_sample_test_book(test_order_book_size);
 
-    engine_state.start_run(test_order_book_size);
+    let count = 1000;
+    let timer = HighResolutionTimer::start(28*100_000_000);
+
+    let start = timer.ns() as u64;
     
+    
+    for i in 0..count {
+
+        let  new_order_buy = Order{
+            product_id: 7 ,
+            order_type: ORDER_TYPE_BUY,
+            price:100000000000,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
+            quantity:3,
+            order_id: i*1_000_000_000,
+            submit_time:100,
+            expire_time:0,
+
+        };
+        
+        engine_state.match_order(new_order_buy);
+
+        // let new_order_sell = Order{
+        //     product_id: 7 ,
+        //     order_type: ORDER_TYPE_SELL,
+        //     price:1,
+        //     price_type: ORDER_PRICE_TYPE_LIMIT,
+        //     quantity:3,
+        //     order_id: 2*count+i,
+        //     submit_time:2*count+i,
+        //     expire_time:0,
+
+        // };
+        // engine_state.match_order(new_order_sell);
+        
+        
+       
+
+
+    }
+    let end = timer.ns() as u64;
+    println!("time consumed {} ns", (end-start));
+    println!("speed {} per second ", ( (1_000_000_000)*(count ) ) /(end-start));
+
+    println!("result {:?}", engine_state.continuous_order_book.match_result);
+    
+    
+    
+    // println!("{:?} ns ",engine_state.continuous_order_book.match_result.total_time());
+
+    // engine_state.continuous_order_book.match_result.order_execution_list.iter().for_each(|oe|{
+    //     println!("{:?}",oe);
+    // });
+
     println!("runs here {}", engine_state.continuous_order_book.asks.len());
+    println!("runs here {}", engine_state.continuous_order_book.bids.len());
 
     Ok(())
 }
+
+

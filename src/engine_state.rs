@@ -23,27 +23,29 @@ impl EngineState {
             product_id,
             //continuous_order_book: Arc::new((ContinuousOrderBook::new(10000, 100)),
             //call_auction_pool:Arc::new(CallAuctionPool::new(10000)),
-            continuous_order_book: ContinuousOrderBook::new(1000, 100),
+            continuous_order_book: ContinuousOrderBook::new(100000, 1,1_000_000,100),
             call_auction_pool: CallAuctionPool::new(1000),
             matched_orders: 0,
             total_received_orders:0 ,
             start_time: now_nanos,
         }
     }
-
+    
     /// Creates a self-contained handler for status broadcasting logic.
-    pub fn new_status_broadcaster(
-        state: Arc<EngineState>
-    ) -> StatusBroadcaster {
-        StatusBroadcaster { state }
-    }
+
 
     pub  fn increase_match(&mut self) {
         self.matched_orders  = self.matched_orders + 1;
         
     }
 
-    pub  fn start_run(&mut self, test_order_book_size:u32 ) {
+    pub  fn match_order(&mut self, new_order: Order) {
+        
+        self.continuous_order_book.match_order(new_order);
+
+    }
+
+    pub  fn load_sample_test_book(&mut self, test_order_book_size:u32 ) {
         
         for i in 0..test_order_book_size {
             let order = self.create_buy_order(i);
@@ -53,8 +55,7 @@ impl EngineState {
             let order = self.create_sell_order(i, test_order_book_size);
             self.continuous_order_book.fuel_order(order);
         }
-        self.continuous_order_book.prepare_index();
-        self.continuous_order_book.update_stats();
+
     }
 
 
