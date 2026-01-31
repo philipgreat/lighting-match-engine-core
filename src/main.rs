@@ -208,9 +208,9 @@ fn show_result(result:MatchResult){
     println!("Speed: {} match results per second.", ( (1_000_000_000)*(2*count ) ) /(end-start));
 
     //println!("result {:?}", engine_state.continuous_order_book.match_result);
-    
+    println!("---------------------------Last match result----------------------");
     show_result(engine_state.continuous_order_book.match_result);
-    
+    println!("===================================================================");
     // println!("{:?} ns ",engine_state.continuous_order_book.match_result.total_time());
 
     // engine_state.continuous_order_book.match_result.order_execution_list.iter().for_each(|oe|{
