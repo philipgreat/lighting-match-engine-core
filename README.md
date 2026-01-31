@@ -49,8 +49,6 @@ Get up and running in minutes!
 
     This command starts an engine instance for product `7` with the tag `FIX009` and a test order book of 10,000 buy and sell orders.
 
-    ```
-
 2.  **See the Magic:**
 
   You'll see a match result like this:
@@ -59,6 +57,8 @@ Get up and running in minutes!
 
   That's an internal match time(core-matching latency) of just **46 nanoseconds** per execution with 1M asks and bids respectively on An Apple M1 Max Macbook Pro.
 
+  Code snippet in main.rs
+  
 ```rust
     let start = timer.ns() as u64;
     
