@@ -38,28 +38,67 @@ Get up and running in minutes!
 1.  **Start the Engine:**
 
     ```bash
-    cargo run -- --prodid 7 --tag FIX009 --test-order-book-size 10k
+    make
+    ```
+
+    or
+
+    ```bash
+    cargo run --release -- --prodid 7 --tag FIX009 --test-order-book-size 10k
     ```
 
     This command starts an engine instance for product `7` with the tag `FIX009` and a test order book of 10,000 buy and sell orders.
 
-2.  **Submit an Order:**
-
-    Clone our command-line tool and submit an order:
-
-    ```bash
-    git clone https://github.com/philipgreat/match-engine-cmd-tool
-    cd match-engine-cmd-tool
-    cargo run -- submit --order-type=sell --product-id=7 --price=1 --quantity=1 --price-type=limit
     ```
 
-3.  **See the Magic:**
+2.  **See the Magic:**
 
   You'll see a match result like this:
 
 ![test screen shot ](docs/test-screen-shot.png)
 
   That's an internal match time(core-matching latency) of just **46 nanoseconds** per execution with 1M asks and bids respectively on An Apple M1 Max Macbook Pro.
+
+```rust
+    let start = timer.ns() as u64;
+    
+    
+    for i in 0..count {
+
+        let  new_order_buy = Order{
+            product_id: 7 ,
+            order_type: ORDER_TYPE_BUY,
+            price:100000000000,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
+            quantity:5,
+            order_id: 1_000_000_000+i,
+            submit_time:100,
+            expire_time:0,
+
+        };
+        
+        engine_state.match_order(new_order_buy);
+
+        let new_order_sell = Order{
+            product_id: 7 ,
+            order_type: ORDER_TYPE_SELL,
+            price:1,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
+            quantity:9,
+            order_id: 2_000_000_000+i+1,
+            submit_time:2_000_000_000+i+1,
+            expire_time:0,
+
+        };
+        engine_state.match_order(new_order_sell);
+
+    }
+    let end = timer.ns() as u64;
+    println!("Time consumed {} ns for {} match request.", (end-start),2*count);
+    println!("Speed: {} match results per second.", ( (1_000_000_000)*(2*count ) ) /(end-start));
+
+```
+
 
 ## ⚙️ How It Works
 

@@ -189,27 +189,23 @@ fn show_result(result:MatchResult){
         
         engine_state.match_order(new_order_buy);
 
-        // let new_order_sell = Order{
-        //     product_id: 7 ,
-        //     order_type: ORDER_TYPE_SELL,
-        //     price:1,
-        //     price_type: ORDER_PRICE_TYPE_LIMIT,
-        //     quantity:3,
-        //     order_id: 2*count+i,
-        //     submit_time:2*count+i,
-        //     expire_time:0,
+        let new_order_sell = Order{
+            product_id: 7 ,
+            order_type: ORDER_TYPE_SELL,
+            price:1,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
+            quantity:9,
+            order_id: 2_000_000_000+i+1,
+            submit_time:2_000_000_000+i+1,
+            expire_time:0,
 
-        // };
-        // engine_state.match_order(new_order_sell);
-        
-        
-       
-
+        };
+        engine_state.match_order(new_order_sell);
 
     }
     let end = timer.ns() as u64;
-    println!("Time consumed {} ns", (end-start));
-    println!("Speed: {} match results per second ", ( (1_000_000_000)*(count ) ) /(end-start));
+    println!("Time consumed {} ns for {} match request.", (end-start),2*count);
+    println!("Speed: {} match results per second.", ( (1_000_000_000)*(2*count ) ) /(end-start));
 
     //println!("result {:?}", engine_state.continuous_order_book.match_result);
     
