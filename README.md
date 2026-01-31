@@ -55,7 +55,7 @@ Get up and running in minutes!
 
 ![test screen shot ](docs/test-screen-shot.png)
 
-  That's an internal match time(core-matching latency) of just **46 nanoseconds** per execution with 1M asks and bids respectively on An Apple M1 Max Macbook Pro.
+  That's an internal match time(core-matching latency) of just **46 nanoseconds** per execution with 10K asks and bids respectively on An Apple M1 Max Macbook Pro.
 
   Code snippet in main.rs
   
