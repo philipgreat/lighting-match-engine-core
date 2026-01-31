@@ -10,13 +10,12 @@ mod message_codec;
 mod number_tool;
 mod continuous_order_book;
 mod call_auction_pool;
-mod test_order_book_builder;
+
 
 use data_types::{EngineState, IncomingMessage, MatchResult};
 
 use number_tool::parse_human_readable_u32;
 
-use test_order_book_builder::TestOrderBookBuilder;
 // use tokio_console::ConsoleLayer;
 /// `listen_port`: 组播地址的端口 (例如 5000)
 /// `multicast_addr`: 组播 IP 地址 (例如 239.0.0.1)
@@ -136,21 +135,13 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
     println!("--------------------------------------------------");
-
-    // 2. Initialize Sockets and JOIN Multicast Group
-
-    println!("--------------------------------------------------");
-
-    // 3. Initialize Engine State
-    let  engine_state = EngineState::new(instance_tag_bytes, prod_id);
-
-    let test_order_book_builder = TestOrderBookBuilder::new(test_order_book_size);
-
-    test_order_book_builder.start_run(engine_state);
     
+    // 3. Initialize Engine State
+    let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
 
-
-    print!("runs here");
+    engine_state.start_run(test_order_book_size);
+    
+    println!("runs here {}", engine_state.continuous_order_book.asks.len());
 
     Ok(())
 }

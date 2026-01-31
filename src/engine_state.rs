@@ -3,9 +3,12 @@ use crate::message_codec;
 
 use crate::data_types::ContinuousOrderBook;
 // use crate::data_types::CallAuctionPool;
-
+use crate::data_types::{
+     ORDER_PRICE_TYPE_LIMIT, ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
+};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::usize;
 
 impl EngineState {
     /// Creates a new EngineState instance with initialized components.
@@ -39,6 +42,61 @@ impl EngineState {
         self.matched_orders  = self.matched_orders + 1;
         
     }
+
+    pub  fn start_run(&mut self, test_order_book_size:u32 ) {
+        
+        for i in 0..test_order_book_size {
+            let order = self.create_buy_order(i);
+            self.continuous_order_book.fuel_order(order);
+        }
+        for i in 0..test_order_book_size {
+            let order = self.create_sell_order(i, test_order_book_size);
+            self.continuous_order_book.fuel_order(order);
+        }
+        self.continuous_order_book.prepare_index();
+        self.continuous_order_book.update_stats();
+    }
+
+
+    
+    pub fn create_buy_order(&self, index: u32) -> Order {
+        //let time_now = time::Instant::now().elapsed().as_nanos() as u64;
+        let time_now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("fail")
+            .as_nanos() as u64;
+        Order {
+            product_id: self.product_id,
+            order_id: (index + 1) as u64,
+            order_type: ORDER_TYPE_BUY,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
+            price: (index + 1) as u64,
+            quantity: 2,
+            submit_time: time_now,
+            expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
+        }
+    }
+
+    pub fn create_sell_order(&self, index: u32, size: u32) -> Order {
+        let time_now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("fail")
+            .as_nanos() as u64;
+
+        Order {
+            product_id: self.product_id,
+            order_id: (size + index + 1) as u64,
+            order_type: ORDER_TYPE_SELL,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
+            price: (size + 1 + index) as u64,
+            quantity: 2,
+            submit_time: time_now,
+            expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
+        }
+    }
+    
+
+
 }
 
 /// Handler responsible for periodically broadcasting the engine's current state/stats.
@@ -47,7 +105,7 @@ pub struct StatusBroadcaster {
 }
 
 impl StatusBroadcaster {
-    
+
     // pub async fn run_status_broadcast(&self) {
 
 
