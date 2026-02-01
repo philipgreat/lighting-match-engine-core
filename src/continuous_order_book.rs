@@ -37,7 +37,8 @@ impl ContinuousOrderBook {
             total_bid_volumn: 0,
             total_ask_volumn: 0,
             match_result: MatchResult::new(trade_cap),
-            timer:HighResolutionTimer::start(28*100_000_000),
+            timer:HighResolutionTimer::start(25*100_000_000), 
+            //most cpu runs on this frequency, change to higher if you are using higher frequency CPU
         }
     }
 

@@ -8,15 +8,16 @@ mod message_codec;
 mod number_tool;
 mod continuous_order_book;
 mod call_auction_pool;
-
+mod text_output_tool;
 
 use data_types::{EngineState,ORDER_TYPE_BUY, 
     ORDER_TYPE_SELL,
     ORDER_PRICE_TYPE_LIMIT, MatchResult};
 
 use number_tool::parse_human_readable_u32;
-
-use crate::{data_types::Order, date_time_tool::current_timestamp, high_resolution_timer::HighResolutionTimer};
+use text_output_tool::print_centered_line;
+use text_output_tool::print_separator;
+use crate::{data_types::Order, high_resolution_timer::HighResolutionTimer};
 
 // use tokio_console::ConsoleLayer;
 /// `listen_port`: 组播地址的端口 (例如 5000)
@@ -116,29 +117,73 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     tag_array
 }
 
-fn show_result(result:MatchResult){
+fn show_result(result: MatchResult) {
+    if result.order_execution_list.is_empty() {
+        return;
+    }
 
+    let time_per_order_execution =
+        result.total_time() as usize / result.order_execution_list.len();
 
-    let time_per_order_execution = result.total_time() as usize / result.order_execution_list.len();
+    // column widths
+    const W_TYPE: usize = 24;
+    const W_PRODUCT: usize = 8;
+    const W_PRICE: usize = 8;
+    const W_QTY: usize = 6;
+    const W_BUY: usize = 14;
+    const W_SELL: usize = 14;
+    const W_LAT: usize = 10;
 
-    result
-    .order_execution_list
-    .iter()
-    .map(|order_exec| {
-        format!(
-            "🔥 ORDER EXECUTION: Product={} | Price={} | Qty={} | BuyOrderID={} | SellOrderId={} | MatchLat={}ns",
-            order_exec.product_id,
-            order_exec.price,
-            order_exec.quantity,
-            order_exec.buy_order_id,
-            order_exec.sell_order_id,
-            time_per_order_execution
-        )
-    })
-    .for_each(|line| println!("{}", line));
-    
+    let header = format!(
+        "{:<W_TYPE$} {:<W_PRODUCT$} {:<W_PRICE$} {:<W_QTY$} {:<W_BUY$} {:<W_SELL$} {:<W_LAT$}",
+        "MSG Type",
+        "Product",
+        "Price",
+        "Qty",
+        "BuyOrderID",
+        "SellOrderID",
+        "Lat(ns)",
+        W_TYPE = W_TYPE,
+        W_PRODUCT = W_PRODUCT,
+        W_PRICE = W_PRICE,
+        W_QTY = W_QTY,
+        W_BUY = W_BUY,
+        W_SELL = W_SELL,
+        W_LAT = W_LAT,
+    );
 
+    let sep = "-".repeat(header.len());
+
+    for (i, o) in result.order_execution_list.iter().enumerate() {
+        // print header every 10 rows
+        if i % 10 == 0 {
+            println!("{}", sep);
+            println!("{}", header);
+            println!("{}", sep);
+        }
+
+        println!(
+            "{:<W_TYPE$} {:<W_PRODUCT$} {:<W_PRICE$} {:<W_QTY$} {:<W_BUY$} {:<W_SELL$} {:<W_LAT$}",
+            "🔥 ORDER EXECUTION",
+            o.product_id,
+            o.price,
+            o.quantity,
+            o.buy_order_id,
+            o.sell_order_id,
+            time_per_order_execution,
+            W_TYPE = W_TYPE,
+            W_PRODUCT = W_PRODUCT,
+            W_PRICE = W_PRICE,
+            W_QTY = W_QTY,
+            W_BUY = W_BUY,
+            W_SELL = W_SELL,
+            W_LAT = W_LAT,
+        );
+    }
+
+    println!("{}", sep);
 }
+
 
  fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Lighting Match Engine Core...");
@@ -161,7 +206,7 @@ fn show_result(result:MatchResult){
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
     println!("  Test order book size: {} bids and {}  asks pectively", test_order_book_size, test_order_book_size);
-    println!("\n============================================================\n");
+    print_separator(100);
     
     // 3. Initialize Engine State
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
@@ -204,13 +249,14 @@ fn show_result(result:MatchResult){
 
     }
     let end = timer.ns() as u64;
-    println!("Time consumed {} ns for {} match request.", (end-start),2*count);
+    println!("Time consumed {}ns for {} match requests.", (end-start),2*count);
     println!("Speed: {} match results per second.\n", ( (1_000_000_000)*(2*count ) ) /(end-start));
     let last_result = engine_state.continuous_order_book.match_result;
     //println!("result {:?}", engine_state.continuous_order_book.match_result);
-    println!("---------------------------Last match result----------------------");
+    
+    print_centered_line("Last match result",'-',80);
     if last_result.total_count()>0 {
-            println!("\nTotal time: {}ns for {} order executions, avarage {} ns per order execution\n", 
+            println!("\nTotal time: {}ns for {} order executions, avarage {}ns per order execution\n", 
         last_result.total_time(), 
         last_result.total_count(),
         last_result.total_time() / last_result.total_count() as u64);
@@ -218,7 +264,7 @@ fn show_result(result:MatchResult){
 
 
     show_result(last_result);
-    println!("===================================================================");
+    print_separator(100);
     // println!("{:?} ns ",engine_state.continuous_order_book.match_result.total_time());
 
     // engine_state.continuous_order_book.match_result.order_execution_list.iter().for_each(|oe|{
