@@ -213,7 +213,7 @@ fn show_result(result: MatchResult) {
     engine_state.load_sample_test_book(test_order_book_size);
 
     let count = 1000;
-    let timer = HighResolutionTimer::start(28*100_000_000);
+    let timer = HighResolutionTimer::start();
 
     let start = timer.ns() as u64;
     
