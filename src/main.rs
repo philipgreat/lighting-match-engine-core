@@ -24,7 +24,7 @@ use cpu_affinity::set_core;
 
 use config::get_config;
 use perf_stats::calculate_perf;
-use perf_stats::print_stats;
+use perf_stats::print_stats_table;
 
 use crate::{data_types::Order, high_resolution_timer::HighResolutionTimer};
 
@@ -132,7 +132,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     show_result(last_result);
     
     if let Some(stats) = perf_stats::calculate_perf(perf_data) {
-        perf_stats::print_stats(&stats);
+        perf_stats::print_stats_table(&stats);
     } else {
         println!("数据为空，无法统计");
     }
