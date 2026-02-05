@@ -47,7 +47,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         Err(e) => {
             eprintln!("Configuration Error: {}", e);
             eprintln!(
-                "Usage: --name <tag_16_chars_max> --prodid <u16> [--trade-addr <ip:port>] [--status-addr <ip:port>]"
+                "Usage: --name <tag_16_chars_max> --prodid <u16> [--test-order-book-size 10k]"
             );
             return Err(e.into());
         }
@@ -58,6 +58,8 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
     println!("  Test order book size: {} bids and {}  asks pectively", test_order_book_size, test_order_book_size);
+    
+    
     print_separator(100);
     
 
