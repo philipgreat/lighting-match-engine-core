@@ -10,106 +10,23 @@ mod continuous_order_book;
 mod call_auction_pool;
 mod text_output_tool;
 mod cpu_affinity;
+mod config;
+
+
 
 use data_types::{EngineState,ORDER_TYPE_BUY, 
     ORDER_TYPE_SELL,
-    ORDER_PRICE_TYPE_LIMIT, MatchResult};
+    ORDER_PRICE_TYPE_LIMIT};
 
-use number_tool::parse_human_readable_u32;
-use text_output_tool::print_centered_line;
-use text_output_tool::print_separator;
+use text_output_tool::{print_centered_line,print_separator,show_result};
+
 use cpu_affinity::set_core;
+
+use config::get_config;
+
 use crate::{data_types::Order, high_resolution_timer::HighResolutionTimer};
 
-// use tokio_console::ConsoleLayer;
-/// `listen_port`: 组播地址的端口 (例如 5000)
-/// `multicast_addr`: 组播 IP 地址 (例如 239.0.0.1)
 
-
-// --- 保持 get_config, tag_to_u8_array 等函数不变 ---
-// --- 保持 get_config, tag_to_u8_array 等函数不变 ---
-fn get_config() -> Result<(String, u16, u32), String> {
-    let args: Vec<String> = std::env::args().collect();
-    let mut instance_name = None;
-    let mut product_id = None;
-    let mut test_order_book_size_str = None;
-
-    // Command Line Arguments Parsing
-    let mut i = 1;
-    while i < args.len() {
-        match args[i].as_str() {
-            "--name" => {
-                if i + 1 < args.len() {
-                    instance_name = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            "--tag" => {
-                if i + 1 < args.len() {
-                    instance_name = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            "--prodid" => {
-                if i + 1 < args.len() {
-                    product_id = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            
-            "--test-order-book-size" => {
-                if i + 1 < args.len() {
-                    test_order_book_size_str = Some(args[i + 1].clone());
-                    i += 1;
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-
-    // 1. Instance Name (Tag)
-    let tag_string = instance_name
-        .or_else(|| std::env::var("INST_NAME").ok())
-        .unwrap_or_else(|| "DEFAULT".to_string());
-
-    if tag_string.len() > 16 {
-        return Err(format!(
-            "Instance tag '{}' exceeds maximum length of 16 characters.",
-            tag_string
-        ));
-    }
-
-    // 2. Product ID
-    let prod_id_str = product_id.ok_or_else(|| {
-        "Missing required argument: --prodid. Also check env var PROD_ID.".to_string()
-    })?;
-    let prod_id: u16 = prod_id_str.parse().map_err(|_| {
-        format!(
-            "Invalid product ID format: '{}'. Must be a valid u16.",
-            prod_id_str
-        )
-    })?;
-
-    // 3. Multicast Addresses
-    
-
-    let size_str: &str = test_order_book_size_str
-        .as_deref() // Converts Option<String> to Option<&str>
-        .unwrap_or("0"); // If None, use "0" as the default &str
-
-    let test_order_book_size: u32 = parse_human_readable_u32(size_str).unwrap_or_else(|e| {
-        eprintln!("Error parsing size '{}': {}", size_str, e);
-        // Fallback u32 value if the parsing of the string (even the default "0") fails
-        0
-    });
-
-    Ok((
-        tag_string,
-        prod_id,
-        test_order_book_size,
-    ))
-}
 
 fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     let mut tag_array = [0u8; 16];
@@ -119,72 +36,6 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     tag_array
 }
 
-fn show_result(result: MatchResult) {
-    if result.order_execution_list.is_empty() {
-        return;
-    }
-
-    let time_per_order_execution =
-        result.total_time() as usize / result.order_execution_list.len();
-
-    // column widths
-    const W_TYPE: usize = 24;
-    const W_PRODUCT: usize = 8;
-    const W_PRICE: usize = 8;
-    const W_QTY: usize = 6;
-    const W_BUY: usize = 14;
-    const W_SELL: usize = 14;
-    const W_LAT: usize = 10;
-
-    let header = format!(
-        "{:<W_TYPE$} {:<W_PRODUCT$} {:<W_PRICE$} {:<W_QTY$} {:<W_BUY$} {:<W_SELL$} {:<W_LAT$}",
-        "MSG Type",
-        "Product",
-        "Price",
-        "Qty",
-        "BuyOrderID",
-        "SellOrderID",
-        "Lat(ns)",
-        W_TYPE = W_TYPE,
-        W_PRODUCT = W_PRODUCT,
-        W_PRICE = W_PRICE,
-        W_QTY = W_QTY,
-        W_BUY = W_BUY,
-        W_SELL = W_SELL,
-        W_LAT = W_LAT,
-    );
-
-    let sep = "-".repeat(header.len());
-
-    for (i, o) in result.order_execution_list.iter().enumerate() {
-        // print header every 10 rows
-        if i % 10 == 0 {
-            println!("{}", sep);
-            println!("{}", header);
-            println!("{}", sep);
-        }
-
-        println!(
-            "{:<W_TYPE$} {:<W_PRODUCT$} {:<W_PRICE$} {:<W_QTY$} {:<W_BUY$} {:<W_SELL$} {:<W_LAT$}",
-            "🔥 ORDER EXECUTION",
-            o.product_id,
-            o.price,
-            o.quantity,
-            o.buy_order_id,
-            o.sell_order_id,
-            time_per_order_execution,
-            W_TYPE = W_TYPE,
-            W_PRODUCT = W_PRODUCT,
-            W_PRICE = W_PRICE,
-            W_QTY = W_QTY,
-            W_BUY = W_BUY,
-            W_SELL = W_SELL,
-            W_LAT = W_LAT,
-        );
-    }
-
-    println!("{}", sep);
-}
 
 
  fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -202,7 +53,6 @@ fn show_result(result: MatchResult) {
         }
     };
 
-    let instance_tag_bytes = tag_to_u16_array(&tag_string);
 
     println!("Configuration Loaded:");
     println!("  Instance Tag: {}", tag_string);
@@ -213,6 +63,7 @@ fn show_result(result: MatchResult) {
 
     set_core(1);
 
+    let instance_tag_bytes = tag_to_u16_array(&tag_string);
 
     // 3. Initialize Engine State
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
