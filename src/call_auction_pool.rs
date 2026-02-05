@@ -21,7 +21,7 @@ impl CallAuctionPool {
 
 /// Optimized Equilibrium Price Calculation using Two-Pointer Sweep-Line.
     /// Complexity: O(N log N) due to sorting, O(N) for scanning.
-pub fn calculate_match_price_final(&self, price_tick: u64) -> Option<(u64, u32)> {
+    pub fn calculate_match_price_final(&self, price_tick: u64) -> Option<(u64, u32)> {
         if self.bids.is_empty() || self.asks.is_empty() || price_tick == 0 {
             return None;
         }

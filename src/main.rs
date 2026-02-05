@@ -11,7 +11,7 @@ mod call_auction_pool;
 mod text_output_tool;
 mod cpu_affinity;
 mod config;
-
+mod perf_stats;
 
 
 use data_types::{EngineState,ORDER_TYPE_BUY, 
@@ -23,6 +23,8 @@ use text_output_tool::{print_centered_line,print_separator,show_result};
 use cpu_affinity::set_core;
 
 use config::get_config;
+use perf_stats::calculate_perf;
+use perf_stats::print_stats;
 
 use crate::{data_types::Order, high_resolution_timer::HighResolutionTimer};
 
@@ -71,12 +73,13 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
     engine_state.load_sample_test_book(test_order_book_size);
 
-    let count = 1000;
+    let count = 1000u64;
     let timer = HighResolutionTimer::start();
 
     let start = timer.ns() as u64;
     
-    
+    let mut perf_data = Vec::with_capacity(count as usize *2);
+
     for i in 0..count {
 
         let  new_order_buy = Order{
@@ -85,13 +88,15 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             price:100000000000,
             price_type: ORDER_PRICE_TYPE_LIMIT,
             quantity:5,
-            order_id: 1_000_000_000+i,
+            order_id: 1_000_000_000 + i,
             submit_time:100,
             expire_time:0,
 
         };
         
+
         engine_state.match_order(new_order_buy);
+        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
 
         let new_order_sell = Order{
             product_id: 7 ,
@@ -105,6 +110,8 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
         };
         engine_state.match_order(new_order_sell);
+        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+
 
     }
     let end = timer.ns() as u64;
@@ -123,6 +130,12 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
 
     show_result(last_result);
+    
+    if let Some(stats) = perf_stats::calculate_perf(perf_data) {
+        perf_stats::print_stats(&stats);
+    } else {
+        println!("数据为空，无法统计");
+    }
     print_separator(100);
     // println!("{:?} ns ",engine_state.continuous_order_book.match_result.total_time());
 
