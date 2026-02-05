@@ -5,3 +5,8 @@ edition = "2024"
 
 [dependencies]
 ahash = "0.8.12"
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_System_Threading"] }
+

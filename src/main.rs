@@ -9,6 +9,7 @@ mod number_tool;
 mod continuous_order_book;
 mod call_auction_pool;
 mod text_output_tool;
+mod cpu_affinity;
 
 use data_types::{EngineState,ORDER_TYPE_BUY, 
     ORDER_TYPE_SELL,
@@ -17,6 +18,7 @@ use data_types::{EngineState,ORDER_TYPE_BUY,
 use number_tool::parse_human_readable_u32;
 use text_output_tool::print_centered_line;
 use text_output_tool::print_separator;
+use cpu_affinity::set_core;
 use crate::{data_types::Order, high_resolution_timer::HighResolutionTimer};
 
 // use tokio_console::ConsoleLayer;
@@ -208,6 +210,10 @@ fn show_result(result: MatchResult) {
     println!("  Test order book size: {} bids and {}  asks pectively", test_order_book_size, test_order_book_size);
     print_separator(100);
     
+
+    set_core(1);
+
+
     // 3. Initialize Engine State
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
     engine_state.load_sample_test_book(test_order_book_size);
