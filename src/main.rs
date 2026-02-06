@@ -73,7 +73,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
     engine_state.load_sample_test_book(test_order_book_size);
 
-    let count = 1000u64;
+    let count = 10000u64;
     let timer = HighResolutionTimer::start();
 
     let start = timer.ns() as u64;
@@ -96,8 +96,10 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         
 
         engine_state.match_order(new_order_buy);
-        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
-
+        if i > 1000 {
+            perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        }
+        
         let new_order_sell = Order{
             product_id: 7 ,
             order_type: ORDER_TYPE_SELL,
@@ -110,8 +112,9 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
         };
         engine_state.match_order(new_order_sell);
-        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
-
+        if i > 1000 {
+            perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        }
 
     }
     let end = timer.ns() as u64;

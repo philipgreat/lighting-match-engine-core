@@ -29,7 +29,7 @@ pub fn calculate_perf(mut data: Vec<u32>) -> Option<Stats> {
 pub fn print_stats_table(s: &Stats) {
     let headers = [
         "P10", "P20", "P30", "P40", "P50", "P60", "P70", "P80", "P90", 
-        "P95", "P96", "P97", "P98", "P99", "P99.9", "P100"
+        "P95", "P96", "P97", "P98", "P99", "P999", "P100"
     ];
 
     // 宽度计算：16个列 * 6字符 = 128
