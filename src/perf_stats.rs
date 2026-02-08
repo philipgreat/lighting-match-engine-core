@@ -32,7 +32,7 @@ pub fn print_stats_table(s: &Stats) {
         "P95", "P96", "P97", "P98", "P99", "P999", "P100"
     ];
 
-    // 宽度计算：16个列 * 6字符 = 128
+    // 宽度计算：16个列 * 6字符 = 96
     let divider = "-".repeat(16*6);
 
     
