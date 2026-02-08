@@ -1,3 +1,22 @@
+[package]
+name = "lighting-match-engine-core"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # =====================
 # macOS Apple Silicon
 # =====================
@@ -34,15 +53,10 @@ rustflags = [
     "-C", "panic=abort"
 ]
 
-[package]
-name = "lighting-match-engine-core"
-version = "0.1.0"
-edition = "2024"
 
 [dependencies]
 ahash = "0.8.12"
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52", features = ["Win32_System_Threading"] }
-
+windows-sys = { version = "=0.61.2", features = ["Win32_System_Performance","Win32_System_Threading"] }

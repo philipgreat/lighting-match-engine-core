@@ -41,6 +41,11 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
 
  fn main() -> Result<(), Box<dyn std::error::Error>> {
+    println!("============= BUILD at {}  by {}@{} ====================\n", 
+    env!("BUILD_TIME"),
+    env!("BUILD_USER"),
+    env!("BUILD_HOSTNAME"));
+    
     println!("Starting Lighting Match Engine Core...");
 
     // 1. Get configuration
@@ -55,7 +60,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         }
     };
 
-
+    
     println!("Configuration Loaded:");
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
@@ -87,7 +92,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             order_type: ORDER_TYPE_BUY,
             price:100000000000,
             price_type: ORDER_PRICE_TYPE_LIMIT,
-            quantity:5,
+            quantity:2,
             order_id: 1_000_000_000 + i,
             submit_time:100,
             expire_time:0,
@@ -96,25 +101,25 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         
 
         engine_state.match_order(new_order_buy);
-        if i > 1000 {
-            perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
-        }
+        
+        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        
         
         let new_order_sell = Order{
             product_id: 7 ,
             order_type: ORDER_TYPE_SELL,
-            price:1,
+            price: 1,
             price_type: ORDER_PRICE_TYPE_LIMIT,
-            quantity:9,
+            quantity:2,
             order_id: 2_000_000_000+i+1,
             submit_time:2_000_000_000+i+1,
             expire_time:0,
 
         };
         engine_state.match_order(new_order_sell);
-        if i > 1000 {
-            perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
-        }
+        
+        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        
 
     }
     let end = timer.ns() as u64;

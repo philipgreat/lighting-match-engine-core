@@ -39,7 +39,7 @@ impl HighResolutionTimer {
     /// - tick_hz not belongs to instance
     /// - calibrate on start
     pub fn start() -> Self {
-        // 触发一次校准（如果还没做）
+        // calibrate on start when not done yet
         let _ = global_tick_hz();
 
         let start_cycles = Self::get_ticks();
@@ -110,13 +110,13 @@ impl HighResolutionTimer {
         (delta * 1_000_000_000u128) / global_tick_hz() as u128
     }
 
-    pub fn us(&self) -> u64 {
-        (self.ns() / 1_000) as u64
-    }
-
-    pub fn ms(&self) -> u64 {
-        (self.ns() / 1_000_000) as u64
-    }
+    // pub fn us(&self) -> u64 {
+    //     (self.ns() / 1_000) as u64
+    // }
+    
+    // pub fn ms(&self) -> u64 {
+    //     (self.ns() / 1_000_000) as u64
+    // }
 }
 
 // ============================================================
