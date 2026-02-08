@@ -3,19 +3,11 @@
 // ================================
 
 use ahash::AHashMap;
-use std::collections::VecDeque;
-
 use crate::data_types::*;
-use crate::date_time_tool::current_timestamp;
 use crate::high_resolution_timer::HighResolutionTimer;
 
-// --- FIFO bucket per price ---
 
-
-// --- Price Ladder Order Book ---
-
-
-impl ContinuousOrderBook {
+impl DenseOrderBook {
     // ----------------------------
     // Init
     // ----------------------------
@@ -37,7 +29,7 @@ impl ContinuousOrderBook {
             total_bid_volumn: 0,
             total_ask_volumn: 0,
             match_result: MatchResult::new(trade_cap),
-            timer:HighResolutionTimer::start(), 
+            timer: HighResolutionTimer::start(), 
             //most cpu runs on this frequency, change to higher if you are using higher frequency CPU
         }
     }

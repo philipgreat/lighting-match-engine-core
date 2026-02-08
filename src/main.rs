@@ -6,12 +6,13 @@ mod engine_state;
 mod high_resolution_timer;
 mod message_codec;
 mod number_tool;
-mod continuous_order_book;
+mod dense_order_book;
 mod call_auction_pool;
 mod text_output_tool;
 mod cpu_affinity;
 mod config;
 mod perf_stats;
+mod sparse_order_book;
 
 
 use data_types::{EngineState,ORDER_TYPE_BUY, 
@@ -64,7 +65,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     println!("Configuration Loaded:");
     println!("  Instance Tag: {}", tag_string);
     println!("  Product ID: {}", prod_id);
-    println!("  Test order book size: {} bids and {}  asks pectively", test_order_book_size, test_order_book_size);
+    println!("  Test order book size: {} bids and {}  asks repectively", test_order_book_size, test_order_book_size);
     
     
     print_separator(100);
@@ -102,7 +103,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
         engine_state.match_order(new_order_buy);
         
-        //perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        //perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
         
         
         let new_order_sell = Order{
@@ -118,7 +119,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         };
         engine_state.match_order(new_order_sell);
         
-        //perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        //perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
         
 
     }
@@ -140,7 +141,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
         engine_state.match_order(new_order_buy);
         
-        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
         
         
         let new_order_sell = Order{
@@ -156,15 +157,15 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         };
         engine_state.match_order(new_order_sell);
         
-        perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
         
 
     }
     let end = timer.ns() as u64;
     println!("Time consumed {}ns for {} match requests.", (end-start),2*count);
     println!("Speed: {} match results per second.\n", ( (1_000_000_000)*(2*count ) ) /(end-start));
-    let last_result = engine_state.continuous_order_book.match_result;
-    //println!("result {:?}", engine_state.continuous_order_book.match_result);
+    let last_result = engine_state.order_book.match_result;
+    //println!("result {:?}", engine_state.order_book.match_result);
     
     print_centered_line("Last match result",'-',80);
     if last_result.total_count()>0 {
@@ -183,9 +184,9 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         println!("数据为空，无法统计");
     }
     print_separator(100);
-    // println!("{:?} ns ",engine_state.continuous_order_book.match_result.total_time());
+    // println!("{:?} ns ",engine_state.order_book.match_result.total_time());
 
-    // engine_state.continuous_order_book.match_result.order_execution_list.iter().for_each(|oe|{
+    // engine_state.order_book.match_result.order_execution_list.iter().for_each(|oe|{
     //     println!("{:?}",oe);
     // });
 

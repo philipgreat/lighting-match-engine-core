@@ -1,9 +1,8 @@
 // --- Message Type Constants ---
 
-use std::sync::Arc;
 use ahash::AHashMap;
 use std::collections::VecDeque;
-
+use std::collections::{BTreeMap};
 use crate::high_resolution_timer::HighResolutionTimer;
 
 pub const MSG_ORDER_SUBMIT: u8 = 1; // Client -> Engine: Order submission
@@ -153,7 +152,7 @@ pub struct OrdersBucket {
 // The core Order Book structure (T in Vec<T>)
 // This implements the layered indexing (Price-Time Priority).
 #[derive(Debug)]
-pub struct ContinuousOrderBook {
+pub struct DenseOrderBook {
     // price ladders
     pub bids: Vec<OrdersBucket>,
     pub asks: Vec<OrdersBucket>,
@@ -179,13 +178,37 @@ pub struct ContinuousOrderBook {
     pub timer: HighResolutionTimer,
 }
 
+#[derive(Debug)]
+pub struct SparseOrderBook {
+    // 使用 BTreeMap 自动按价格排序
+    pub bids: BTreeMap<u64, OrdersBucket>,
+    pub asks: BTreeMap<u64, OrdersBucket>,
+    
+    // order_id -> (is_buy, price) 快速索引，用于 O(log N) 取消订单
+    pub order_map: AHashMap<u64, (bool, u64)>,
+    
+    pub total_bid_volumn: u32,
+    pub total_ask_volumn: u32,
+    pub match_result: MatchResult,
+    
+    // 基础配置（为了保持接口一致性保留）
+    pub tick: u64,
+    pub base_price: u64,
+    
+    pub timer: HighResolutionTimer,
+}
+
+
+
+pub type OrderBook = DenseOrderBook;
+
 // Engine State and Context
 #[derive(Debug)]
 pub struct EngineState {
     pub instance_tag: [u8; 16],
     pub product_id: u16,
     // Order Book
-    pub continuous_order_book: ContinuousOrderBook,
+    pub order_book: OrderBook,
     pub call_auction_pool:  CallAuctionPool,
     // Counters
     pub matched_orders: u64,

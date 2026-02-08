@@ -1,11 +1,12 @@
 use crate::data_types::{BroadcastStats, CallAuctionPool, EngineState, MESSAGE_TOTAL_SIZE};
 use crate::message_codec;
 
-use crate::data_types::ContinuousOrderBook;
+use crate::data_types::DenseOrderBook;
 // use crate::data_types::CallAuctionPool;
 use crate::data_types::{
-     ORDER_PRICE_TYPE_LIMIT, ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,
+     ORDER_PRICE_TYPE_LIMIT, ORDER_TYPE_BUY, ORDER_TYPE_SELL, Order,SparseOrderBook
 };
+
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -21,9 +22,10 @@ impl EngineState {
         EngineState {
             instance_tag,
             product_id,
-            //continuous_order_book: Arc::new((ContinuousOrderBook::new(10000, 100)),
+            //continuous_order_book: Arc::new((DenseOrderBook::new(10000, 100)),
             //call_auction_pool:Arc::new(CallAuctionPool::new(10000)),
-            continuous_order_book: ContinuousOrderBook::new(100000, 1,1_000_000,100),
+            order_book: DenseOrderBook::new(100000, 1,1_000_000,100),
+            //order_book: SparseOrderBook::new(100000, 1,1_000_000,100),
             call_auction_pool: CallAuctionPool::new(1000),
             matched_orders: 0,
             total_received_orders:0 ,
@@ -42,7 +44,7 @@ impl EngineState {
 
     pub  fn match_order(&mut self, new_order: Order) {
         
-        self.continuous_order_book.match_order(new_order);
+        self.order_book.match_order(new_order);
 
     }
 
@@ -50,11 +52,11 @@ impl EngineState {
         
         for i in 0..test_order_book_size {
             let order = self.create_buy_order(i);
-            self.continuous_order_book.fuel_order(order);
+            self.order_book.fuel_order(order);
         }
         for i in 0..test_order_book_size {
             let order = self.create_sell_order(i, test_order_book_size);
-            self.continuous_order_book.fuel_order(order);
+            self.order_book.fuel_order(order);
         }
 
     }
@@ -117,7 +119,7 @@ impl StatusBroadcaster {
     //         // Wait for the next tick
 
     //         // 1. Lock necessary shared data
-    //         let continuous_order_book = self.state.continuous_order_book;
+    //         let continuous_order_book = self.state.order_book;
     //         let matched_orders = self.state.matched_orders;
     //         let total_received_orders = self.state.total_received_orders;
 
