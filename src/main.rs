@@ -92,6 +92,44 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             order_type: ORDER_TYPE_BUY,
             price:100000000000,
             price_type: ORDER_PRICE_TYPE_LIMIT,
+            quantity: 1,
+            order_id: 1_000_000_000 + i,
+            submit_time:100,
+            expire_time:0,
+
+        };
+        
+
+        engine_state.match_order(new_order_buy);
+        
+        //perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        
+        
+        let new_order_sell = Order{
+            product_id: 7 ,
+            order_type: ORDER_TYPE_SELL,
+            price: 1,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
+            quantity: 1,
+            order_id: 2_000_000_000+i+1,
+            submit_time:2_000_000_000+i+1,
+            expire_time:0,
+
+        };
+        engine_state.match_order(new_order_sell);
+        
+        //perf_data.push(engine_state.continuous_order_book.match_result.time_per_trade() as u32);
+        
+
+    }
+
+    for i in 0..count {
+
+        let  new_order_buy = Order{
+            product_id: 7 ,
+            order_type: ORDER_TYPE_BUY,
+            price:100000000000,
+            price_type: ORDER_PRICE_TYPE_LIMIT,
             quantity: 2,
             order_id: 1_000_000_000 + i,
             submit_time:100,
