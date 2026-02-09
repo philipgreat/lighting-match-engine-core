@@ -26,7 +26,7 @@ pub fn serialize_order(order: &Order) -> [u8; MESSAGE_TOTAL_SIZE] {
     // Quantity (u32)
     buf[payload_start + 18..payload_start + 22].copy_from_slice(&order.quantity.to_be_bytes());
     // Order Type (u8)
-    buf[payload_start + 22] = order.order_type;
+    buf[payload_start + 22] = order.order_side;
     // Price Type (u8)
     buf[payload_start + 23] = order.price_type;
     // Submit Time (u64)
@@ -242,7 +242,7 @@ pub fn deserialize_order(payload: &[u8]) -> Result<Order, &'static str> {
         order_id,
         price,
         quantity,
-        order_type,
+        order_side: order_type,
         price_type,
         submit_time,
         expire_time

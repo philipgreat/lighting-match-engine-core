@@ -90,7 +90,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
         let  new_order_buy = Order{
             product_id: 7 ,
-            order_type: ORDER_TYPE_BUY,
+            order_side: ORDER_TYPE_BUY,
             price:100000000000,
             price_type: ORDER_PRICE_TYPE_LIMIT,
             quantity: 1,
@@ -108,7 +108,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         
         let new_order_sell = Order{
             product_id: 7 ,
-            order_type: ORDER_TYPE_SELL,
+            order_side: ORDER_TYPE_SELL,
             price: 1,
             price_type: ORDER_PRICE_TYPE_LIMIT,
             quantity: 1,
@@ -128,7 +128,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
         let  new_order_buy = Order{
             product_id: 7 ,
-            order_type: ORDER_TYPE_BUY,
+            order_side: ORDER_TYPE_BUY,
             price:100000000000,
             price_type: ORDER_PRICE_TYPE_LIMIT,
             quantity: 2,
@@ -146,7 +146,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
         
         let new_order_sell = Order{
             product_id: 7 ,
-            order_type: ORDER_TYPE_SELL,
+            order_side: ORDER_TYPE_SELL,
             price: 1,
             price_type: ORDER_PRICE_TYPE_LIMIT,
             quantity: 9,

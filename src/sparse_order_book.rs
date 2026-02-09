@@ -24,8 +24,8 @@ impl SparseOrderBook {
             bids: BTreeMap::new(),
             asks: BTreeMap::new(),
             order_map: AHashMap::with_capacity(1024),
-            total_bid_volumn: 0,
-            total_ask_volumn: 0,
+            total_bid_volume: 0,
+            total_ask_volume: 0,
             match_result: MatchResult::new(trade_cap),
             tick,
             base_price,
@@ -71,9 +71,9 @@ impl SparseOrderBook {
             if let Some(pos) = bucket.orders.iter().position(|o| o.order_id == order_id) {
                 let o = bucket.orders.remove(pos).unwrap();
                 if is_buy {
-                    self.total_bid_volumn -= o.quantity;
+                    self.total_bid_volume -= o.quantity;
                 } else {
-                    self.total_ask_volumn -= o.quantity;
+                    self.total_ask_volume -= o.quantity;
                 }
                 
                 // 如果该价格档位空了，移除它以节省内存
@@ -97,10 +97,10 @@ impl SparseOrderBook {
         self.order_map.insert(order.order_id, (is_buy, price));
         
         let bucket = if is_buy {
-            self.total_bid_volumn += order.quantity;
+            self.total_bid_volume += order.quantity;
             self.bids.entry(price).or_default()
         } else {
-            self.total_ask_volumn += order.quantity;
+            self.total_ask_volume += order.quantity;
             self.asks.entry(price).or_default()
         };
         
@@ -117,13 +117,13 @@ impl SparseOrderBook {
 
             // 修复点：调用关联函数，只传入需要的字段引用
             Self::execute_matching(
-                order, 
-                bucket, 
-                true, 
-                &mut self.match_result, 
+                order,
+                bucket,
+                true,
+                &mut self.match_result,
                 &mut self.order_map,
-                &mut self.total_ask_volumn, // 传入需要修改的量
-                &mut self.total_bid_volumn
+                &mut self.total_ask_volume, // 传入需要修改的量
+                &mut self.total_bid_volume
             );
             
             if bucket.orders.is_empty() {
@@ -143,13 +143,13 @@ impl SparseOrderBook {
             }
 
             Self::execute_matching(
-                order, 
-                bucket, 
-                false, 
-                &mut self.match_result, 
+                order,
+                bucket,
+                false,
+                &mut self.match_result,
                 &mut self.order_map,
-                &mut self.total_ask_volumn,
-                &mut self.total_bid_volumn
+                &mut self.total_ask_volume,
+                &mut self.total_bid_volume
             );
             
             if bucket.orders.is_empty() {

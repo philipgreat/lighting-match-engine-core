@@ -26,8 +26,8 @@ impl DenseOrderBook {
             base_price,
             levels: max_levels,
             order_map: AHashMap::with_capacity(1024),
-            total_bid_volumn: 0,
-            total_ask_volumn: 0,
+            total_bid_volume: 0,
+            total_ask_volume: 0,
             match_result: MatchResult::new(trade_cap),
             timer: HighResolutionTimer::start(), 
             //most cpu runs on this frequency, change to higher if you are using higher frequency CPU
@@ -49,12 +49,12 @@ impl DenseOrderBook {
         if order.is_buy() {
             self.bids[idx].orders.push_back(order.clone());
             self.best_bid = self.best_bid.max(idx as isize);
-            self.total_bid_volumn += order.quantity;
+            self.total_bid_volume += order.quantity;
             self.order_map.insert(order.order_id, (true, idx));
         } else {
             self.asks[idx].orders.push_back(order.clone());
             self.best_ask = self.best_ask.min(idx as isize);
-            self.total_ask_volumn += order.quantity;
+            self.total_ask_volume += order.quantity;
             self.order_map.insert(order.order_id, (false, idx));
         }
     }
@@ -105,7 +105,7 @@ impl DenseOrderBook {
             let qty = order.quantity.min(resting.quantity);
             order.quantity -= qty;
             resting.quantity -= qty;
-            self.total_ask_volumn -= qty;
+            self.total_ask_volume -= qty;
 
             self.match_result.order_execution_list.push(OrderExecution {
                 instance_tag: [0; 16],
@@ -148,7 +148,7 @@ impl DenseOrderBook {
             let qty = order.quantity.min(resting.quantity);
             order.quantity -= qty;
             resting.quantity -= qty;
-            self.total_bid_volumn -= qty;
+            self.total_bid_volume -= qty;
 
             self.match_result.order_execution_list.push(OrderExecution {
                 instance_tag: [0; 16],
@@ -187,9 +187,9 @@ impl DenseOrderBook {
         if let Some(pos) = bucket.orders.iter().position(|o| o.order_id == order_id) {
             let o = bucket.orders.remove(pos).unwrap();
             if is_buy {
-                self.total_bid_volumn -= o.quantity;
+                self.total_bid_volume -= o.quantity;
             } else {
-                self.total_ask_volumn -= o.quantity;
+                self.total_ask_volume -= o.quantity;
             }
             return true;
         }

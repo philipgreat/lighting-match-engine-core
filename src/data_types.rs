@@ -30,18 +30,17 @@ pub const MESSAGE_TOTAL_SIZE: usize = 64; // All network packets are 64 bytes fi
 
 
 // --- Data Structure Definitions ---
-
+#[repr(C, align(64))]
 // Order Structure (for MSG_ORDER_SUBMIT)
 #[derive(Debug, Clone)]
 pub struct Order {
     pub product_id: u16,  // Product identifier (2 bytes)
-    pub order_type: u8,   // Order side (BUY/SELL/MOCK_BUY/MOCK_SELL/) (1 byte)
+    pub order_side: u8,   // Order side (BUY/SELL) (1 byte)
     pub price_type: u8,   // Price type (LIMIT/MARKET) (1 byte)
     pub quantity: u32,    // Quantity (4 bytes)
 
     pub order_id: u64,    // Unique order ID (8 bytes)
     pub price: u64,       // Price (8 bytes)
-
 
     pub submit_time: u64, // Submission timestamp (Nanoseconds) (8 bytes)
     pub expire_time: u64, // Expiration timestamp (Nanoseconds. 0 means GTC) (8 bytes)
@@ -170,8 +169,8 @@ pub struct DenseOrderBook {
     pub order_map: AHashMap<u64, (bool, usize)>,
 
     // stats
-    pub total_bid_volumn: u32,
-    pub total_ask_volumn: u32,
+    pub total_bid_volume: u32,
+    pub total_ask_volume: u32,
 
     pub match_result: MatchResult,
 
@@ -187,8 +186,8 @@ pub struct SparseOrderBook {
     // order_id -> (is_buy, price) 快速索引，用于 O(log N) 取消订单
     pub order_map: AHashMap<u64, (bool, u64)>,
     
-    pub total_bid_volumn: u32,
-    pub total_ask_volumn: u32,
+    pub total_bid_volume: u32,
+    pub total_ask_volume: u32,
     pub match_result: MatchResult,
     
     // 基础配置（为了保持接口一致性保留）
@@ -199,9 +198,9 @@ pub struct SparseOrderBook {
 }
 
 
+pub type OrderBook = DenseOrderBook;
+//pub type OrderBook = SparseOrderBook;
 
-//pub type OrderBook = DenseOrderBook;
-pub type OrderBook = SparseOrderBook;
 
 // Engine State and Context
 #[derive(Debug)]
@@ -229,17 +228,17 @@ pub struct CallAuctionPool {
 impl Order {
     #[inline(always)]
     pub fn is_buy(&self) -> bool {
-        self.order_type == ORDER_TYPE_BUY || self.order_type == ORDER_TYPE_MOCK_BUY
+        self.order_side == ORDER_TYPE_BUY || self.order_side == ORDER_TYPE_MOCK_BUY
     }
 
     #[inline(always)]
     pub fn is_sell(&self) -> bool {
-        self.order_type == ORDER_TYPE_SELL || self.order_type == ORDER_TYPE_MOCK_SELL
+        self.order_side == ORDER_TYPE_SELL || self.order_side == ORDER_TYPE_MOCK_SELL
     }
 
     #[inline(always)]
     pub fn is_mocked_order(&self) -> bool {
-        self.order_type > 2
+        self.order_side > 2
     }
 }
 

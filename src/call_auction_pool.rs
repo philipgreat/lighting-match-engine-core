@@ -12,7 +12,7 @@ impl CallAuctionPool {
 
     /// Adds an incoming order to the appropriate side of the pool.
     pub fn add_order(&mut self, order: Order) {
-        match order.order_type {
+        match order.order_side {
             ORDER_TYPE_BUY | ORDER_TYPE_MOCK_BUY => self.bids.push(order),
             ORDER_TYPE_SELL | ORDER_TYPE_MOCK_SELL => self.asks.push(order),
             _ => {} // Ignore unknown types
