@@ -82,6 +82,7 @@ impl DenseOrderBook {
         self.match_result.end_time = self.timer.ns() as u64;
     }
 
+
     // ----------------------------
     // BUY vs ASK
     // ----------------------------
