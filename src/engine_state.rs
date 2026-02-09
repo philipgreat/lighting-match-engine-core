@@ -1,4 +1,4 @@
-use crate::data_types::{BroadcastStats, CallAuctionPool, EngineState, MESSAGE_TOTAL_SIZE};
+use crate::data_types::{BroadcastStats, CallAuctionPool, EngineState, MESSAGE_TOTAL_SIZE,OrderBook};
 use crate::message_codec;
 
 use crate::data_types::DenseOrderBook;
@@ -24,7 +24,7 @@ impl EngineState {
             product_id,
             //continuous_order_book: Arc::new((DenseOrderBook::new(10000, 100)),
             //call_auction_pool:Arc::new(CallAuctionPool::new(10000)),
-            order_book: DenseOrderBook::new(100000, 1,1_000_000,100),
+            order_book: OrderBook::new(100000, 1,1_000_000,100),
             //order_book: SparseOrderBook::new(100000, 1,1_000_000,100),
             call_auction_pool: CallAuctionPool::new(1000),
             matched_orders: 0,

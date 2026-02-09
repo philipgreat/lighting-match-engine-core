@@ -200,7 +200,8 @@ pub struct SparseOrderBook {
 
 
 
-pub type OrderBook = DenseOrderBook;
+//pub type OrderBook = DenseOrderBook;
+pub type OrderBook = SparseOrderBook;
 
 // Engine State and Context
 #[derive(Debug)]
