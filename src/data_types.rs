@@ -45,6 +45,7 @@ pub struct Order {
     pub submit_time: u64, // Submission timestamp (Nanoseconds) (8 bytes)
     pub expire_time: u64, // Expiration timestamp (Nanoseconds. 0 means GTC) (8 bytes)
                           // Total Payload Size: 40 bytes
+    pub _padding: [u8; 24]
 }
 
 // Order Cancellation Structure (for MSG_ORDER_CANCEL)

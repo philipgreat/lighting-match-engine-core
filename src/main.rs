@@ -97,6 +97,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             order_id: 1_000_000_000 + i,
             submit_time:100,
             expire_time:0,
+            _padding: [0u8; 24]
 
         };
         
@@ -115,7 +116,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             order_id: 2_000_000_000+i+1,
             submit_time:2_000_000_000+i+1,
             expire_time:0,
-
+            _padding: [0u8; 24]
         };
         engine_state.match_order(new_order_sell);
         
@@ -135,7 +136,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             order_id: 1_000_000_000 + i,
             submit_time:100,
             expire_time:0,
-
+            _padding: [0u8; 24]
         };
         
 
@@ -153,6 +154,7 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
             order_id: 2_000_000_000+i+1,
             submit_time:2_000_000_000+i+1,
             expire_time:0,
+            _padding: [0u8; 24]
 
         };
         engine_state.match_order(new_order_sell);
@@ -178,12 +180,14 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
     show_result(last_result);
     
-    if let Some(stats) = perf_stats::calculate_perf(perf_data) {
+    if let Some(stats) = perf_stats::calculate_perf(&perf_data) {
         perf_stats::print_stats_table(&stats);
     } else {
         println!("数据为空，无法统计");
     }
     print_separator(100);
+
+    perf_stats::save_perf_to_file(&perf_data)?;
     // println!("{:?} ns ",engine_state.order_book.match_result.total_time());
 
     // engine_state.order_book.match_result.order_execution_list.iter().for_each(|oe|{

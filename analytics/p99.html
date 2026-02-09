@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>P99 / P999 周期特征分析</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;font-family:system-ui;background:#fafafa}
+header{padding:16px 20px;border-bottom:1px solid #ddd;background:#fff}
+h1{margin:0;font-size:18px}
+.wrap{max-width:1200px;margin:0 auto;padding:16px;display:grid;gap:14px}
+.card{background:#fff;border:1px solid #ddd;border-radius:12px;padding:14px}
+textarea{width:100%;min-height:160px;font-family:ui-monospace,monospace;border:1px solid #ccc;border-radius:8px;padding:8px}
+button{padding:6px 12px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}
+button:hover{background:#f2f2f2}
+canvas{width:100%;height:280px;border:1px solid #ddd;border-radius:10px;background:#fff}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.kpi{border:1px solid #ddd;border-radius:10px;padding:8px}
+.kpi .t{font-size:12px;color:#666}
+.kpi .v{font-size:16px;font-weight:700}
+</style>
+</head>
+
+<body>
+<header>
+  <h1>P99 / P999 周期特征分析（行号 = 时间）</h1>
+</header>
+
+<div class="wrap">
+
+<div class="card">
+  <button id="analyze">分析 p99 / p999 周期</button>
+  <button id="demo">示例数据</button>
+  <textarea id="input" placeholder="每一行一个整数（采集顺序）"></textarea>
+</div>
+
+<div class="card">
+  <div class="kpis" id="kpis"></div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div style="font-weight:700">p99 峰值出现间距（Δindex）</div>
+    <canvas id="p99gap"></canvas>
+  </div>
+  <div class="card">
+    <div style="font-weight:700">p999 峰值出现间距（Δindex）</div>
+    <canvas id="p999gap"></canvas>
+  </div>
+</div>
+
+</div>
+
+<script>
+function parseData(t){
+  return t.split(/\s+/).map(x=>+x).filter(Number.isFinite);
+}
+function percentile(sorted,p){
+  const i=Math.ceil(p*sorted.length)-1;
+  return sorted[Math.max(0,Math.min(sorted.length-1,i))];
+}
+function drawHist(canvas,data){
+  const ctx=canvas.getContext("2d");
+  const dpr=devicePixelRatio;
+  const w=canvas.clientWidth*dpr,h=canvas.clientHeight*dpr;
+  canvas.width=w;canvas.height=h;
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+
+  if(!data.length) return;
+
+  const min=Math.min(...data),max=Math.max(...data);
+  const bins=40;
+  const span=max-min||1;
+  const cnt=new Array(bins).fill(0);
+  data.forEach(v=>{
+    let i=Math.floor((v-min)/span*bins);
+    if(i===bins)i=bins-1;
+    cnt[i]++;
+  });
+  const maxC=Math.max(...cnt);
+  const pad=40;
+  ctx.strokeStyle="#ccc";
+  ctx.beginPath();
+  ctx.moveTo(pad,pad);
+  ctx.lineTo(pad,h-pad);
+  ctx.lineTo(w-pad,h-pad);
+  ctx.stroke();
+
+  const bw=(w-2*pad)/bins;
+  cnt.forEach((c,i)=>{
+    const bh=c/maxC*(h-2*pad);
+    ctx.fillStyle="rgba(0,0,0,.2)";
+    ctx.fillRect(pad+i*bw,h-pad-bh,bw-1,bh);
+  });
+}
+document.getElementById("analyze").onclick=()=>{
+  const data=parseData(input.value);
+  if(data.length<100) return alert("数据太少");
+
+  const sorted=[...data].sort((a,b)=>a-b);
+  const p99=percentile(sorted,0.99);
+  const p999=percentile(sorted,0.999);
+
+  const p99Idx=[],p999Idx=[];
+  data.forEach((v,i)=>{
+    if(v>=p99)p99Idx.push(i);
+    if(v>=p999)p999Idx.push(i);
+  });
+
+  const gaps=a=>a.slice(1).map((v,i)=>v-a[i]);
+
+  const p99Gap=gaps(p99Idx);
+  const p999Gap=gaps(p999Idx);
+
+  const k=document.getElementById("kpis");
+  k.innerHTML="";
+  [
+    ["样本数",data.length],
+    ["p99",p99],
+    ["p999",p999],
+    ["p99点数",p99Idx.length],
+    ["p999点数",p999Idx.length],
+    ["p99平均间距",Math.round(p99Gap.reduce((a,b)=>a+b,0)/p99Gap.length||0)],
+    ["p999平均间距",Math.round(p999Gap.reduce((a,b)=>a+b,0)/p999Gap.length||0)]
+  ].forEach(x=>{
+    const d=document.createElement("div");
+    d.className="kpi";
+    d.innerHTML=`<div class="t">${x[0]}</div><div class="v">${x[1]}</div>`;
+    k.appendChild(d);
+  });
+
+  drawHist(p99gap,p99Gap);
+  drawHist(p999gap,p999Gap);
+};
+
+document.getElementById("demo").onclick=()=>{
+  const a=[];
+  for(let i=0;i<30000;i++){
+    let v=150+Math.random()*40;
+    if(i%250===0)v=2000;
+    if(i%1000===0)v=5000;
+    a.push(Math.round(v));
+  }
+  input.value=a.join("\n");
+};
+</script>
+</body>
+</html>

@@ -43,8 +43,10 @@ impl SparseOrderBook {
 
     pub fn match_order(&mut self, mut order: Order) {
         self.match_result.order_execution_list.clear();
-        self.match_result.start_time = self.timer.ns() as u64;
-
+#[cfg(feature = "match-timing")]
+{
+    self.match_result.start_time = self.timer.ns() as u64;
+}
         if order.is_buy() {
             self.match_buy(&mut order);
         } else {
@@ -55,8 +57,10 @@ impl SparseOrderBook {
         if order.quantity > 0 && order.price_type == ORDER_PRICE_TYPE_LIMIT {
             self.add_resting_order(order);
         }
-        
+#[cfg(feature = "match-timing")]
+{        
         self.match_result.end_time = self.timer.ns() as u64;
+}
     }
 
     pub fn cancel_order(&mut self, order_id: u64) -> bool {

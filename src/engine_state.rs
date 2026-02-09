@@ -78,6 +78,7 @@ impl EngineState {
             quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
+            _padding: [0u8; 24]
         }
     }
 
@@ -96,6 +97,7 @@ impl EngineState {
             quantity: 2,
             submit_time: time_now,
             expire_time: time_now + 1000 * 1000 * 1000 * 1000 * 10,
+            _padding: [0u8; 24]
         }
     }
     

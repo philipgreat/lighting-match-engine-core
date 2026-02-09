@@ -67,8 +67,10 @@ impl DenseOrderBook {
     // ----------------------------
     pub fn match_order(&mut self, mut order: Order) {
         self.match_result.order_execution_list.clear();
+#[cfg(feature = "match-timing")]
+{         
         self.match_result.start_time = self.timer.ns() as u64;
-
+}
         if order.is_buy() {
             self.match_buy(&mut order);
         } else {
@@ -78,8 +80,10 @@ impl DenseOrderBook {
         if order.quantity > 0 && order.price_type == ORDER_PRICE_TYPE_LIMIT {
             self.add_order(order);
         }
-        
+#[cfg(feature = "match-timing")]
+{         
         self.match_result.end_time = self.timer.ns() as u64;
+}
     }
 
 

@@ -245,7 +245,8 @@ pub fn deserialize_order(payload: &[u8]) -> Result<Order, &'static str> {
         order_side: order_type,
         price_type,
         submit_time,
-        expire_time
+        expire_time,
+        _padding: [0u8; 24]
     })
 }
 
