@@ -14,7 +14,7 @@ mod config;
 mod perf_stats;
 mod sparse_order_book;
 
-
+use crate::number_tool::Separatable;
 use data_types::{EngineState,ORDER_TYPE_BUY, 
     ORDER_TYPE_SELL,
     ORDER_PRICE_TYPE_LIMIT};
@@ -162,8 +162,8 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
 
     }
     let end = timer.ns() as u64;
-    println!("Time consumed {}ns for {} match requests.", (end-start),2*count);
-    println!("Speed: {} match results per second.\n", ( (1_000_000_000)*(2*count ) ) /(end-start));
+    println!("Elapsed: {:>15} ns for {} match results.", (end-start).separated_string(),(2*count).separated_string());
+    println!("Speed  : {:>15} match results/sec.\n", ((1_000_000_000)*(2*count )  /(end-start)).separated_string() );
     let last_result = engine_state.order_book.match_result;
     //println!("result {:?}", engine_state.order_book.match_result);
     

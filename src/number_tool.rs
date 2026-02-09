@@ -63,3 +63,83 @@ pub fn parse_human_readable_u32(s: &str) -> Result<u32, &'static str> {
         Ok(final_value as u32)
     }
 }
+
+
+
+pub trait Separatable {
+    fn separated_string(&self) -> String;
+    fn separated_with(&self, separator: char) -> String;
+}
+
+impl Separatable for u32 {
+    fn separated_string(&self) -> String {
+        self.separated_with(',')
+    }
+    
+    fn separated_with(&self, separator: char) -> String {
+        let num_str = self.to_string();
+        format_with_separator(&num_str, separator)
+    }
+}
+
+impl Separatable for u64 {
+    fn separated_string(&self) -> String {
+        self.separated_with(',')
+    }
+    
+    fn separated_with(&self, separator: char) -> String {
+        let num_str = self.to_string();
+        format_with_separator(&num_str, separator)
+    }
+}
+
+// 核心格式化函数
+fn format_with_separator(num_str: &str, separator: char) -> String {
+    let mut result = String::with_capacity(num_str.len() + num_str.len() / 3);
+    let mut count = 0;
+
+    for ch in num_str.chars().rev() {
+        if count == 3 {
+            result.push(separator);
+            count = 0;
+        }
+        result.push(ch);
+        count += 1;
+    }
+
+    result.chars().rev().collect()
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_formatting() {
+        assert_eq!(123u32.separated_string(), "123");
+        assert_eq!(1234u32.separated_string(), "1,234");
+        assert_eq!(1234567u32.separated_string(), "1,234,567");
+        assert_eq!(1234567890u32.separated_string(), "1,234,567,890");
+    }
+
+    #[test]
+    fn test_custom_separator() {
+        assert_eq!(123456u32.separated_with(' '), "123 456");
+        assert_eq!(1234567u32.separated_with('_'), "1_234_567");
+        assert_eq!(12345678u32.separated_with('.'), "12.345.678");
+    }
+
+    #[test]
+    fn test_u64_support() {
+        let large_num: u64 = 12345678901234567890;
+        assert_eq!(large_num.separated_string(), "12,345,678,901,234,567,890");
+    }
+
+    #[test]
+    fn test_edge_cases() {
+        assert_eq!(0u32.separated_string(), "0");
+        assert_eq!(1u32.separated_string(), "1");
+        assert_eq!(999u32.separated_string(), "999");
+    }
+}
