@@ -1,5 +1,4 @@
-
-use crate::data_types::{MatchResult};
+use crate::data_types::MatchResult;
 
 pub fn print_separator(eq_len: usize) {
     println!("\n{}\n", "=".repeat(eq_len));
@@ -9,8 +8,7 @@ pub fn show_result(result: MatchResult) {
         return;
     }
 
-    let time_per_order_execution =
-        result.total_time() as usize / result.order_execution_list.len();
+    let time_per_order_execution = result.total_time() as usize / result.order_execution_list.len();
 
     // column widths
     const W_TYPE: usize = 24;

@@ -1,4 +1,5 @@
 all:
+	mkdir -p perf-data
 	cargo run --features match-timing --release -- --prodid 7 --name AAPL --test-order-book-size 50k
 notiming:
 	cargo run  --release -- --prodid 7 --name AAPL --test-order-book-size 50k
