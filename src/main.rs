@@ -135,7 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             order_side: ORDER_TYPE_SELL,
             price: 1,
             price_type: ORDER_PRICE_TYPE_LIMIT,
-            quantity: 1,
+            quantity: 9,
             order_id: 2_000_000_000 + i + 1,
             submit_time: 2_000_000_000 + i + 1,
             expire_time: 0,
