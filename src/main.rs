@@ -95,7 +95,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         engine_state.match_order(new_order_buy);
 
-        //perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
+        //perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
 
         let new_order_sell = Order {
             product_id: 7,
@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         engine_state.match_order(new_order_sell);
 
-        //perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
+        //perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
     }
 
     for i in 0..count {
@@ -128,7 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         engine_state.match_order(new_order_buy);
 
-        perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
+        perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
 
         let new_order_sell = Order {
             product_id: 7,
@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _padding: [0u8; 24],
         };
         engine_state.match_order(new_order_sell);
-        perf_data.push(engine_state.order_book.match_result.time_per_trade() as u32);
+        perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
     }
     let end = timer.ns() as u64;
     println!(

@@ -129,7 +129,7 @@ pub fn serialize_match_result(result: &MatchResult) -> Vec<Vec<u8>> {
 
     let mut batches = Vec::new();
 
-    let time_per_trade = result.time_per_trade();
+    let time_per_trade = result.time_per_order_execution();
     for chunk in result.order_execution_list.chunks(BATCH_SIZE) {
         let mut buf = Vec::with_capacity(MESSAGE_TOTAL_SIZE * chunk.len());
 

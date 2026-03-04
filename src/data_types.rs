@@ -112,7 +112,7 @@ impl MatchResult {
      pub fn total_time(& self)-> u64{
        self.end_time - self.start_time
      }
-     pub fn time_per_trade(&self)->u32{
+     pub fn time_per_order_execution(&self)->u32{
         if self.total_count() == 0 {
             return 0
         }
