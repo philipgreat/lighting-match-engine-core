@@ -65,10 +65,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     print_separator(100);
 
-    set_core(1);
+    set_core(0);
 
     let instance_tag_bytes = tag_to_u16_array(&tag_string);
-
+    
     // 3. Initialize Engine State
     let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
     engine_state.load_sample_test_book(test_order_book_size);
