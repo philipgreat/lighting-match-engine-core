@@ -1,10 +1,18 @@
+use crate::engine_core::clock::Clock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct SystemClock;
+
+impl Clock for SystemClock {
+    fn now_ns(&self) -> u64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("fail")
+            .as_nanos() as u64
+    }
+}
+
 pub fn current_timestamp() -> u64 {
-    //time::Instant::now().elapsed().as_nanos() as u64
-    let now_nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("fail")
-        .as_nanos() as u64;
-    now_nanos
+    SystemClock.now_ns()
 }

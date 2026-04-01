@@ -100,6 +100,42 @@ Get up and running in minutes!
 
 ```
 
+## Bare-Metal / GRUB Boot
+
+The repo now also contains a separate bare-metal kernel target that can be loaded by GRUB.
+
+Detailed migration notes:
+
+```bash
+docs/baremetal-migration.md
+```
+
+Build the kernel ELF:
+
+```bash
+bash scripts/build-kernel.sh
+```
+
+This produces:
+
+```bash
+target/x86_64-unknown-none/release/kernel
+```
+
+Try to assemble a GRUB ISO:
+
+```bash
+bash scripts/build-grub-iso.sh
+```
+
+If `grub-mkrescue` is installed, the ISO will be written to:
+
+```bash
+target/lighting-match-engine-core.iso
+```
+
+On boot, the kernel writes status text directly to the VGA text buffer and runs a small in-kernel order-matching smoke test to prove the core logic is executing without an OS.
+
 
 ## ⚙️ How It Works
 

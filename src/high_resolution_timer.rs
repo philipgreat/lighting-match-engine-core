@@ -7,6 +7,7 @@ use windows_sys::Win32::System::Performance::{
     QueryPerformanceFrequency,
 };
 
+use crate::engine_core::clock::Stopwatch;
 use std::sync::OnceLock;
 
 /// ------------------------------------------------------------
@@ -117,6 +118,12 @@ impl HighResolutionTimer {
     // pub fn ms(&self) -> u64 {
     //     (self.ns() / 1_000_000) as u64
     // }
+}
+
+impl Stopwatch for HighResolutionTimer {
+    fn elapsed_ns(&self) -> u64 {
+        self.ns() as u64
+    }
 }
 
 // ============================================================

@@ -7,6 +7,7 @@ build = "build.rs"
 
 [features]
 match-timing = []
+baremetal = []
 
 # =====================
 # macOS Apple Silicon
@@ -46,8 +47,21 @@ rustflags = [
 
 
 [dependencies]
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
 ahash = "0.8.12"
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_System_Performance","Win32_System_Threading"] }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[[bin]]
+name = "kernel"
+path = "src/bin/kernel.rs"
+required-features = ["baremetal"]
