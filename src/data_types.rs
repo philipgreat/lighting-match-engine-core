@@ -199,8 +199,8 @@ pub struct SparseOrderBook {
 }
 
 
-pub type OrderBook = DenseOrderBook;
-//pub type OrderBook = SparseOrderBook;
+//pub type OrderBook = DenseOrderBook;
+pub type OrderBook = SparseOrderBook;
 
 
 // Engine State and Context
@@ -242,6 +242,5 @@ impl Order {
         self.order_side > 2
     }
 }
-
 
 

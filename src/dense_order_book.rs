@@ -40,6 +40,26 @@ impl DenseOrderBook {
         ((price - self.base_price) / self.tick) as usize
     }
 
+    fn advance_best_bid_down(&mut self) {
+        while self.best_bid >= 0 {
+            let idx = self.best_bid as usize;
+            if !self.bids[idx].orders.is_empty() {
+                break;
+            }
+            self.best_bid -= 1;
+        }
+    }
+
+    fn advance_best_ask_up(&mut self) {
+        while self.best_ask < self.asks.len() as isize {
+            let idx = self.best_ask as usize;
+            if !self.asks[idx].orders.is_empty() {
+                break;
+            }
+            self.best_ask += 1;
+        }
+    }
+
     // ----------------------------
     // Add resting order
     // ----------------------------
@@ -91,7 +111,7 @@ impl DenseOrderBook {
     // BUY vs ASK
     // ----------------------------
     fn match_buy(&mut self, order: &mut Order) {
-        while order.quantity > 0 && self.best_ask <= self.best_bid {
+        while order.quantity > 0 && self.best_ask < self.asks.len() as isize {
             let idx = self.best_ask as usize;
             let bucket = &mut self.asks[idx];
 
@@ -126,6 +146,9 @@ impl DenseOrderBook {
             if resting.quantity == 0 {
                 let o = bucket.orders.pop_front().unwrap();
                 self.order_map.remove(&o.order_id);
+                if bucket.orders.is_empty() {
+                    self.advance_best_ask_up();
+                }
             }
         }
     }
@@ -134,7 +157,7 @@ impl DenseOrderBook {
     // SELL vs BID
     // ----------------------------
     fn match_sell(&mut self, order: &mut Order) {
-        while order.quantity > 0 && self.best_bid >= self.best_ask {
+        while order.quantity > 0 && self.best_bid >= 0 {
             let idx = self.best_bid as usize;
             let bucket = &mut self.bids[idx];
 
@@ -169,6 +192,9 @@ impl DenseOrderBook {
             if resting.quantity == 0 {
                 let o = bucket.orders.pop_front().unwrap();
                 self.order_map.remove(&o.order_id);
+                if bucket.orders.is_empty() {
+                    self.advance_best_bid_down();
+                }
             }
         }
     }
@@ -192,8 +218,14 @@ impl DenseOrderBook {
             let o = bucket.orders.remove(pos).unwrap();
             if is_buy {
                 self.total_bid_volume -= o.quantity;
+                if bucket.orders.is_empty() && self.best_bid == idx as isize {
+                    self.advance_best_bid_down();
+                }
             } else {
                 self.total_ask_volume -= o.quantity;
+                if bucket.orders.is_empty() && self.best_ask == idx as isize {
+                    self.advance_best_ask_up();
+                }
             }
             return true;
         }

@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2024"
 build = "build.rs"
 
+[lib]
+crate-type = ["rlib", "cdylib"]
 
 [features]
 match-timing = []
+redis-module-host = ["dep:redis-module"]
 
 # =====================
 # macOS Apple Silicon
@@ -48,6 +51,7 @@ rustflags = [
 [dependencies]
 ahash = "0.8.12"
 libc = "0.2"
+redis-module = { version = "2.0.7", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_System_Performance","Win32_System_Threading"] }

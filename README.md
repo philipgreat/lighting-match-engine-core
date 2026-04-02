@@ -100,6 +100,177 @@ Get up and running in minutes!
 
 ```
 
+## Redis Module Mode
+
+The project can also run as a Redis Module host for remote invocation through Redis commands.
+
+Performance report:
+
+- [docs/performance-report-2026-04-02.md](/Users/Philip/githome/lighting-match-engine-core/docs/performance-report-2026-04-02.md)
+
+### Build the module
+
+```bash
+cargo build --features redis-module-host
+```
+
+On macOS the module artifact is:
+
+```bash
+target/debug/liblighting_match_engine_core.dylib
+```
+
+On Linux the module artifact is:
+
+```bash
+target/debug/liblighting_match_engine_core.so
+```
+
+### Start Redis with the module
+
+```bash
+redis-server --loadmodule /absolute/path/to/liblighting_match_engine_core.dylib
+```
+
+### Supported Redis commands
+
+- `fix.send <product_id> <fix_message>`
+- `fix.book <product_id>`
+- `fix.stats <product_id>`
+- `fix.reset <product_id>`
+
+### Supported FIX business messages
+
+- `35=D` NewOrderSingle
+- `35=F` OrderCancelRequest
+- `35=G` OrderCancelReplaceRequest
+- `35=H` OrderStatusRequest
+
+This module does not implement FIX session management. FIX is only used as the business payload format carried inside Redis commands.
+
+### FIX input rules
+
+- `ClOrdID(11)` must be a decimal `u64` string
+- `OrigClOrdID(41)` must be a decimal `u64` string
+- the external caller is responsible for uniqueness
+- input accepts either `|` or SOH as field delimiters
+- output is normalized to `|`
+
+### Example: submit a resting buy order
+
+```bash
+redis-cli fix.send 7 '35=D|11=1001|54=1|38=5|40=2|44=101|55=AAPL|'
+```
+
+Example reply:
+
+```text
+35=8|11=1001|17=1001-NEW-0|150=0|39=0|14=0|151=5|32=0|31=101|55=AAPL|
+```
+
+### Example: cancel an order
+
+```bash
+redis-cli fix.send 7 '35=F|11=2001|41=1001|55=AAPL|'
+```
+
+### Example: replace an order
+
+```bash
+redis-cli fix.send 7 '35=G|11=1002|41=1001|54=1|38=8|40=2|44=102|55=AAPL|'
+```
+
+### Example: inspect state
+
+```bash
+redis-cli fix.book 7
+redis-cli fix.stats 7
+redis-cli fix.reset 7
+```
+
+`fix.book` now returns a structured map with:
+
+- `product_id`
+- `best_bid`
+- `best_ask`
+- `bid_levels`
+- `ask_levels`
+- `total_bid_volume`
+- `total_ask_volume`
+
+### Example: query order status
+
+```bash
+redis-cli fix.send 7 '35=H|37=1002|55=AAPL|'
+```
+
+Example reply:
+
+```text
+35=8|11=1002|17=1002-CXL-0|150=4|39=4|14=0|151=8|32=0|31=102|55=AAPL|
+```
+
+### Testing
+
+Core and FIX adapter tests:
+
+```bash
+cargo test
+```
+
+Include Redis Module feature-gated code in compilation:
+
+```bash
+cargo test --lib --features redis-module-host
+```
+
+Current automated coverage includes:
+
+- FIX parsing for `35=D` and `35=G`
+- FIX parsing for `35=H`
+- duplicate order rejection
+- crossing trade generation
+- cancel and replace flows
+- multi-fill execution report sequencing
+- service-level `book`, `stats`, and `reset`
+- status-query responses for known and unknown orders
+
+If you only want to verify the module code compiles, use:
+
+```bash
+cargo check --features redis-module-host
+```
+
+Manual end-to-end verification against a local Redis instance:
+
+```bash
+redis-server --port 6380 --loadmodule /absolute/path/to/liblighting_match_engine_core.dylib
+redis-cli -p 6380 fix.send 7 '35=D|11=1001|54=1|38=5|40=2|44=101|55=AAPL|'
+redis-cli -p 6380 fix.send 7 '35=G|11=1002|41=1001|54=1|38=8|40=2|44=102|55=AAPL|'
+redis-cli -p 6380 fix.book 7
+redis-cli -p 6380 shutdown nosave
+```
+
+### Reused-Connection Latency Script
+
+To avoid `redis-cli` process startup cost, use the persistent-connection Rust benchmark:
+
+```bash
+cargo run --release --bin redis_module_latency -- --host 127.0.0.1 --port 6380 --mode stats
+```
+
+Supported modes:
+
+- `stats`
+- `status`
+- `new`
+
+Example:
+
+```bash
+cargo run --release --bin redis_module_latency -- --port 6380 --mode new --iterations 5000 --warmup 500
+```
+
 
 ## ⚙️ How It Works
 

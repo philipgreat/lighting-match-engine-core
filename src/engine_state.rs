@@ -14,6 +14,21 @@ use std::time::{SystemTime, UNIX_EPOCH};
 impl EngineState {
     /// Creates a new EngineState instance with initialized components.
     pub fn new(instance_tag: [u8; 16], product_id: u16) -> Self {
+        Self::new_with_book_params(instance_tag, product_id, 100000, 1, 1_000_000, 100)
+    }
+
+    pub fn new_for_redis_module(instance_tag: [u8; 16], product_id: u16) -> Self {
+        Self::new_with_book_params(instance_tag, product_id, 1, 1, 1_000_000, 100)
+    }
+
+    fn new_with_book_params(
+        instance_tag: [u8; 16],
+        product_id: u16,
+        tick: u64,
+        base_price: u64,
+        max_levels: usize,
+        trade_cap: usize,
+    ) -> Self {
         let now_nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("fail")
@@ -24,7 +39,7 @@ impl EngineState {
             product_id,
             //continuous_order_book: Arc::new((DenseOrderBook::new(10000, 100)),
             //call_auction_pool:Arc::new(CallAuctionPool::new(10000)),
-            order_book: OrderBook::new(100000, 1,1_000_000,100),
+            order_book: OrderBook::new(tick, base_price, max_levels, trade_cap),
             //order_book: SparseOrderBook::new(100000, 1,1_000_000,100),
             call_auction_pool: CallAuctionPool::new(1000),
             matched_orders: 0,
