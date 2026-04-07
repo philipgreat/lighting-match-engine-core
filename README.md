@@ -44,7 +44,7 @@ Get up and running in minutes!
     or
 
     ```bash
-    cargo run --release -- --prodid 7 --tag FIX009 --test-order-book-size 10k
+    cargo run --features match-timing --release -- --prodid 7 --name AAPL --test-order-book-size 50k
     ```
 
     This command starts an engine instance for product `7` with the tag `FIX009` and a test order book of 10,000 buy and sell orders.
@@ -55,7 +55,7 @@ Get up and running in minutes!
 
 ![test screen shot ](docs/test-screen-shot.png)
 
-  That's an internal match time(core-matching latency) of just **46 nanoseconds** per execution with 10K asks and bids respectively on An Apple M1 Max Macbook Pro.
+  That's an internal match time(core-matching latency) of just **8 nanoseconds** per order execution with 50K asks and bids respectively on An Apple M1 Max Macbook Pro.
 
   Code snippet in main.rs
   
