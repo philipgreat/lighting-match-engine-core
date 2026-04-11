@@ -1,29 +1,23 @@
-mod call_auction_pool;
 mod config;
-mod cpu_affinity;
-mod data_types;
-mod date_time_tool;
-mod dense_order_book;
-mod engine_state;
-mod high_resolution_timer;
-mod message_codec;
-mod number_tool;
-mod perf_stats;
-mod sparse_order_book;
-mod text_output_tool;
+mod orderbook;
+mod protocol;
+mod stats;
+mod system;
+mod timer;
+mod types;
+mod utils;
 
-use crate::number_tool::Separatable;
-use data_types::{EngineState, ORDER_PRICE_TYPE_LIMIT, ORDER_TYPE_BUY, ORDER_TYPE_SELL};
+use std::process::ExitCode;
 
-use text_output_tool::{print_centered_line, print_separator, show_result};
-
-use cpu_affinity::set_core;
+use crate::protocol::{format_order_submit_error_cli, serialize_order_book_error_reply, OrderBookErrorReply};
+use crate::utils::Separatable;
+use crate::types::{EngineState, OrderBook, OrderFlags, OrderRequest, OrderSide, PriceType};
+use crate::stats::{print_centered_line, print_separator, show_result};
+use crate::orderbook::build_order_book;
+use crate::system::set_core;
 
 use config::get_config;
-use perf_stats::calculate_perf;
-use perf_stats::print_stats_table;
-
-use crate::{data_types::Order, high_resolution_timer::HighResolutionTimer};
+use crate::timer::HighResolutionTimer;
 
 fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     let mut tag_array = [0u8; 16];
@@ -33,7 +27,17 @@ fn tag_to_u16_array(tag: &str) -> [u8; 16] {
     tag_array
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("{}", err);
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "============= BUILD at {}  by {}@{} ====================\n",
         env!("BUILD_TIME"),
@@ -44,36 +48,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Starting Lighting Match Engine Core...");
 
     // 1. Get configuration
-    let (tag_string, prod_id, test_order_book_size) = match get_config() {
+    let app_config = match get_config() {
         Ok(config) => config,
         Err(e) => {
             eprintln!("Configuration Error: {}", e);
             eprintln!(
-                "Usage: --name <tag_16_chars_max> --prodid <u16> [--test-order-book-size 10k]"
+                "Usage: --name <tag_16_chars_max> --prodid <u16> [--test-order-book-size 10k] [--order-book dense|sparse] [--tick N] [--base-price N] [--max-levels N] [--trade-cap N]"
             );
             return Err(e.into());
         }
     };
 
     println!("Configuration Loaded:");
-    println!("  Instance Tag: {}", tag_string);
-    println!("  Product ID: {}", prod_id);
+    println!("  Instance Tag: {}", app_config.instance_name);
+    println!("  Product ID: {}", app_config.product_id);
+    println!("  Order Book: {:?}", app_config.order_book.kind);
+    println!(
+        "  Order Book Config: tick={} base_price={} max_levels={} trade_cap={}",
+        app_config.order_book.tick,
+        app_config.order_book.base_price,
+        app_config.order_book.max_levels,
+        app_config.order_book.trade_cap
+    );
     println!(
         "  Test order book size: {} bids and {}  asks repectively",
-        test_order_book_size, test_order_book_size
+        app_config.test_order_book_size, app_config.test_order_book_size
     );
 
     print_separator(100);
 
     set_core(0);
 
-    let instance_tag_bytes = tag_to_u16_array(&tag_string);
+    let instance_tag_bytes = tag_to_u16_array(&app_config.instance_name);
+    let order_book = build_order_book(app_config.order_book);
     
     // 3. Initialize Engine State
-    let mut engine_state = EngineState::new(instance_tag_bytes, prod_id);
-    engine_state.load_sample_test_book(test_order_book_size);
+    let mut engine_state = EngineState::new(instance_tag_bytes, app_config.product_id, order_book);
+    if let Err(err) = engine_state.load_sample_test_book(app_config.test_order_book_size) {
+        eprintln!("{}", format_order_submit_error_cli(&err));
+        let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
+        let _encoded_reply = serialize_order_book_error_reply(&reply);
+        return Err(Box::new(err));
+    }
 
-    let count = 10000u64;
+    let count = 1000u64;
     let timer = HighResolutionTimer::start();
 
     let start = timer.ns() as u64;
@@ -81,44 +99,57 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut perf_data = Vec::with_capacity(count as usize * 2);
 
     for i in 0..count {
-        let new_order_buy = Order {
+        let new_order_buy = OrderRequest {
             product_id: 7,
-            order_side: ORDER_TYPE_BUY,
-            price: 100000000000,
-            price_type: ORDER_PRICE_TYPE_LIMIT,
+            side: OrderSide::Buy,
+            price: 10000,
+            price_type: PriceType::Limit,
+            flags: OrderFlags::default(),
             quantity: 1,
             order_id: 1_000_000_000 + i,
             submit_time: 100,
             expire_time: 0,
             _padding: [0u8; 24],
         };
-
-        engine_state.match_order(new_order_buy);
+        
+        if let Err(err) = engine_state.match_order(new_order_buy) {
+            eprintln!("{}", format_order_submit_error_cli(&err));
+            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
+            let _encoded_reply = serialize_order_book_error_reply(&reply);
+            return Err(Box::new(err));
+        }
 
         //perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
 
-        let new_order_sell = Order {
+        let new_order_sell = OrderRequest {
             product_id: 7,
-            order_side: ORDER_TYPE_SELL,
+            side: OrderSide::Sell,
             price: 1,
-            price_type: ORDER_PRICE_TYPE_LIMIT,
+            price_type: PriceType::Limit,
+            flags: OrderFlags::default(),
             quantity: 1,
             order_id: 2_000_000_000 + i + 1,
             submit_time: 2_000_000_000 + i + 1,
             expire_time: 0,
             _padding: [0u8; 24],
         };
-        engine_state.match_order(new_order_sell);
+        if let Err(err) = engine_state.match_order(new_order_sell) {
+            eprintln!("{}", format_order_submit_error_cli(&err));
+            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
+            let _encoded_reply = serialize_order_book_error_reply(&reply);
+            return Err(Box::new(err));
+        }
 
         //perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
     }
 
     for i in 0..count {
-        let new_order_buy = Order {
+        let new_order_buy = OrderRequest {
             product_id: 7,
-            order_side: ORDER_TYPE_BUY,
-            price: 100000000000,
-            price_type: ORDER_PRICE_TYPE_LIMIT,
+            side: OrderSide::Buy,
+            price: 10000,
+            price_type: PriceType::Limit,
+            flags: OrderFlags::default(),
             quantity: 1,
             order_id: 1_000_000_000 + i,
             submit_time: 100,
@@ -126,23 +157,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             _padding: [0u8; 24],
         };
 
-        engine_state.match_order(new_order_buy);
+        if let Err(err) = engine_state.match_order(new_order_buy) {
+            eprintln!("{}", format_order_submit_error_cli(&err));
+            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
+            let _encoded_reply = serialize_order_book_error_reply(&reply);
+            return Err(Box::new(err));
+        }
 
-        perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
+        perf_data.push(engine_state.order_book.last_outcome().time_per_trade() as u32);
 
-        let new_order_sell = Order {
+        let new_order_sell = OrderRequest {
             product_id: 7,
-            order_side: ORDER_TYPE_SELL,
+            side: OrderSide::Sell,
             price: 1,
-            price_type: ORDER_PRICE_TYPE_LIMIT,
+            price_type: PriceType::Limit,
+            flags: OrderFlags::default(),
             quantity: 9,
             order_id: 2_000_000_000 + i + 1,
             submit_time: 2_000_000_000 + i + 1,
             expire_time: 0,
             _padding: [0u8; 24],
         };
-        engine_state.match_order(new_order_sell);
-        perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
+        if let Err(err) = engine_state.match_order(new_order_sell) {
+            eprintln!("{}", format_order_submit_error_cli(&err));
+            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
+            let _encoded_reply = serialize_order_book_error_reply(&reply);
+            return Err(Box::new(err));
+        }
+        perf_data.push(engine_state.order_book.last_outcome().time_per_trade() as u32);
     }
     let end = timer.ns() as u64;
     println!(
@@ -154,13 +196,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Speed  : {:>15} match results/sec.\n",
         ((1_000_000_000) * (2 * count) / (end - start)).separated_string()
     );
-    let last_result = engine_state.order_book.match_result;
-    //println!("result {:?}", engine_state.order_book.match_result);
+    let last_result = engine_state.order_book.last_outcome().clone();
+    //println!("result {:?}", engine_state.order_book.last_outcome());
 
     print_centered_line("Last match result", '-', 80);
     if last_result.total_count() > 0 {
         println!(
-            "\nTotal time: {}ns for {} order executions, avarage {}ns per order execution\n",
+            "\nTotal time: {}ns for {} trades, avarage {}ns per trade\n",
             last_result.total_time(),
             last_result.total_count(),
             last_result.total_time() / last_result.total_count() as u64
@@ -169,17 +211,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     show_result(last_result);
 
-    if let Some(stats) = perf_stats::calculate_perf(&perf_data) {
-        perf_stats::print_stats_table(&stats);
+    if let Some(stats) = stats::calculate_perf(&perf_data) {
+        stats::print_stats_table(&stats);
     } else {
         println!("数据为空，无法统计");
     }
     print_separator(100);
 
-    perf_stats::save_perf_to_file(&perf_data)?;
-    // println!("{:?} ns ",engine_state.order_book.match_result.total_time());
+    stats::save_perf_to_file(&perf_data)?;
+    // println!("{:?} ns ",engine_state.order_book.last_outcome().total_time());
 
-    // engine_state.order_book.match_result.order_execution_list.iter().for_each(|oe|{
+    // engine_state.order_book.last_outcome().trades.iter().for_each(|oe|{
     //     println!("{:?}",oe);
     // });
 
