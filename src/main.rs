@@ -11,10 +11,10 @@ use std::process::ExitCode;
 
 use crate::protocol::{format_order_submit_error_cli, serialize_order_book_error_reply, OrderBookErrorReply};
 use crate::utils::Separatable;
-use crate::types::{EngineState, OrderBook, OrderFlags, OrderRequest, OrderSide, PriceType};
+use crate::types::{EngineState, OrderBook, OrderFlags, OrderRequest, OrderSide, PriceType, SubmitOrderError, TradingSessionError};
 use crate::stats::{print_centered_line, print_separator, show_result};
 use crate::orderbook::build_order_book;
-use crate::system::set_core;
+use crate::system::{run_demo_session, set_core};
 
 use config::get_config;
 use crate::timer::HighResolutionTimer;
@@ -33,6 +33,41 @@ fn main() -> ExitCode {
         Err(err) => {
             eprintln!("{}", err);
             ExitCode::from(1)
+        }
+    }
+}
+
+fn handle_submit_error(
+    instance_tag_bytes: [u8; 16],
+    err: SubmitOrderError,
+) -> Box<dyn std::error::Error> {
+    match err {
+        SubmitOrderError::Continuous(err) => {
+            eprintln!("{}", format_order_submit_error_cli(&err));
+            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
+            let _encoded_reply = serialize_order_book_error_reply(&reply);
+            Box::new(err)
+        }
+        SubmitOrderError::CallAuction(err) => {
+            eprintln!("{}", err);
+            Box::new(err)
+        }
+        SubmitOrderError::InvalidPhase { .. } => {
+            eprintln!("{}", err);
+            Box::new(err)
+        }
+    }
+}
+
+fn handle_trading_session_error(
+    instance_tag_bytes: [u8; 16],
+    err: TradingSessionError,
+) -> Box<dyn std::error::Error> {
+    match err {
+        TradingSessionError::Submit(err) => handle_submit_error(instance_tag_bytes, err),
+        TradingSessionError::Transition(err) => {
+            eprintln!("{}", err);
+            Box::new(err)
         }
     }
 }
@@ -84,6 +119,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     
     // 3. Initialize Engine State
     let mut engine_state = EngineState::new(instance_tag_bytes, app_config.product_id, order_book);
+    let session_summary = run_demo_session(&mut engine_state, app_config.order_book.tick, 1_000, 9_000)
+        .map_err(|err| handle_trading_session_error(instance_tag_bytes, err))?;
+    print_centered_line("Opening call auction", '-', 80);
+    show_result(session_summary.opening_auction.clone());
+    if let Some(closing_auction) = session_summary.closing_auction.clone() {
+        print_centered_line("Closing call auction", '-', 80);
+        show_result(closing_auction);
+    }
+
     if let Err(err) = engine_state.load_sample_test_book(app_config.test_order_book_size) {
         eprintln!("{}", format_order_submit_error_cli(&err));
         let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
@@ -112,11 +156,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             _padding: [0u8; 24],
         };
         
-        if let Err(err) = engine_state.match_order(new_order_buy) {
-            eprintln!("{}", format_order_submit_error_cli(&err));
-            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
-            let _encoded_reply = serialize_order_book_error_reply(&reply);
-            return Err(Box::new(err));
+        if let Err(err) = engine_state.submit_order(new_order_buy) {
+            return Err(handle_submit_error(instance_tag_bytes, err));
         }
 
         //perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
@@ -133,11 +174,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             expire_time: 0,
             _padding: [0u8; 24],
         };
-        if let Err(err) = engine_state.match_order(new_order_sell) {
-            eprintln!("{}", format_order_submit_error_cli(&err));
-            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
-            let _encoded_reply = serialize_order_book_error_reply(&reply);
-            return Err(Box::new(err));
+        if let Err(err) = engine_state.submit_order(new_order_sell) {
+            return Err(handle_submit_error(instance_tag_bytes, err));
         }
 
         //perf_data.push(engine_state.order_book.match_result.time_per_order_execution() as u32);
@@ -157,11 +195,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             _padding: [0u8; 24],
         };
 
-        if let Err(err) = engine_state.match_order(new_order_buy) {
-            eprintln!("{}", format_order_submit_error_cli(&err));
-            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
-            let _encoded_reply = serialize_order_book_error_reply(&reply);
-            return Err(Box::new(err));
+        if let Err(err) = engine_state.submit_order(new_order_buy) {
+            return Err(handle_submit_error(instance_tag_bytes, err));
         }
 
         perf_data.push(engine_state.order_book.last_outcome().time_per_trade() as u32);
@@ -178,11 +213,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             expire_time: 0,
             _padding: [0u8; 24],
         };
-        if let Err(err) = engine_state.match_order(new_order_sell) {
-            eprintln!("{}", format_order_submit_error_cli(&err));
-            let reply = OrderBookErrorReply::from_submit_error(instance_tag_bytes, &err);
-            let _encoded_reply = serialize_order_book_error_reply(&reply);
-            return Err(Box::new(err));
+        if let Err(err) = engine_state.submit_order(new_order_sell) {
+            return Err(handle_submit_error(instance_tag_bytes, err));
         }
         perf_data.push(engine_state.order_book.last_outcome().time_per_trade() as u32);
     }

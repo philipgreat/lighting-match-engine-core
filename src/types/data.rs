@@ -218,6 +218,23 @@ impl fmt::Display for OrderBookError {
 
 impl Error for OrderBookError {}
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CallAuctionPoolError {
+    UnsupportedPriceType { price_type: PriceType },
+}
+
+impl fmt::Display for CallAuctionPoolError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnsupportedPriceType { price_type } => {
+                write!(f, "call auction only supports limit orders, got {:?}", price_type)
+            }
+        }
+    }
+}
+
+impl Error for CallAuctionPoolError {}
+
 #[derive(Debug, Clone)]
 pub struct OrderSubmitError {
     pub order: OrderRequest,
@@ -235,6 +252,141 @@ impl fmt::Display for OrderSubmitError {
 }
 
 impl Error for OrderSubmitError {}
+
+#[derive(Debug, Clone)]
+pub struct CallAuctionOrderSubmitError {
+    pub order: OrderRequest,
+    pub source: CallAuctionPoolError,
+}
+
+impl fmt::Display for CallAuctionOrderSubmitError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "order_id={} product_id={} rejected by call auction: {}",
+            self.order.order_id, self.order.product_id, self.source
+        )
+    }
+}
+
+impl Error for CallAuctionOrderSubmitError {}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuctionKind {
+    Opening,
+    Closing,
+    VolatilityInterruption,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MarketPhase {
+    PreOpen,
+    AuctionOrderEntry(AuctionKind),
+    AuctionFrozen(AuctionKind),
+    AuctionMatching(AuctionKind),
+    ContinuousTrading,
+    TradingHalt,
+    Closed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MarketStructureConfig {
+    pub has_opening_auction: bool,
+    pub has_closing_auction: bool,
+    pub allows_volatility_auction: bool,
+}
+
+impl Default for MarketStructureConfig {
+    fn default() -> Self {
+        Self {
+            has_opening_auction: true,
+            has_closing_auction: false,
+            allows_volatility_auction: false,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum SubmitOrderError {
+    Continuous(OrderSubmitError),
+    CallAuction(CallAuctionOrderSubmitError),
+    InvalidPhase { phase: MarketPhase },
+}
+
+impl fmt::Display for SubmitOrderError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Continuous(err) => write!(f, "{}", err),
+            Self::CallAuction(err) => write!(f, "{}", err),
+            Self::InvalidPhase { phase } => {
+                write!(f, "order submission is not allowed during phase {:?}", phase)
+            }
+        }
+    }
+}
+
+impl Error for SubmitOrderError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PhaseTransitionError {
+    InvalidTransition {
+        from: MarketPhase,
+        to: MarketPhase,
+    },
+    UnsupportedAuctionKind {
+        kind: AuctionKind,
+    },
+    MissingActiveAuction {
+        phase: MarketPhase,
+    },
+    ActiveAuctionAlreadyExists {
+        kind: AuctionKind,
+    },
+    InvalidPhaseForAuctionExecution {
+        phase: MarketPhase,
+    },
+}
+
+impl fmt::Display for PhaseTransitionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidTransition { from, to } => {
+                write!(f, "invalid market phase transition from {:?} to {:?}", from, to)
+            }
+            Self::UnsupportedAuctionKind { kind } => {
+                write!(f, "auction kind {:?} is not enabled by market structure", kind)
+            }
+            Self::MissingActiveAuction { phase } => {
+                write!(f, "phase {:?} requires an active auction session", phase)
+            }
+            Self::ActiveAuctionAlreadyExists { kind } => {
+                write!(f, "cannot start {:?} auction because another auction session is active", kind)
+            }
+            Self::InvalidPhaseForAuctionExecution { phase } => {
+                write!(f, "cannot execute call auction during phase {:?}", phase)
+            }
+        }
+    }
+}
+
+impl Error for PhaseTransitionError {}
+
+#[derive(Debug)]
+pub enum TradingSessionError {
+    Submit(SubmitOrderError),
+    Transition(PhaseTransitionError),
+}
+
+impl fmt::Display for TradingSessionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Submit(err) => write!(f, "{}", err),
+            Self::Transition(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl Error for TradingSessionError {}
 
 #[derive(Debug, Clone, Copy)]
 pub struct MatchedRestingOrder {
@@ -335,7 +487,9 @@ pub struct EngineState {
     pub instance_tag: [u8; 16],
     pub product_id: u16,
     pub order_book: AnyOrderBook,
-    pub call_auction_pool: CallAuctionPool,
+    pub market_structure: MarketStructureConfig,
+    pub phase: MarketPhase,
+    pub active_auction: Option<AuctionSession>,
     pub matched_orders: u64,
     pub total_received_orders: u64,
     pub start_time: u64,
@@ -345,6 +499,16 @@ pub struct EngineState {
 pub struct CallAuctionPool {
     pub bids: Vec<RestingOrder>,
     pub asks: Vec<RestingOrder>,
+}
+
+#[derive(Debug)]
+pub struct AuctionSession {
+    pub kind: AuctionKind,
+    pub pool: CallAuctionPool,
+    pub started_at: u64,
+    pub frozen_at: Option<u64>,
+    pub matched_at: Option<u64>,
+    pub last_outcome: MatchOutcome,
 }
 
 impl OrderRequest {

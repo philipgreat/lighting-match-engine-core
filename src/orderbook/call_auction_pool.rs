@@ -1,4 +1,5 @@
 use crate::types::*;
+use std::cmp::Ordering;
 use std::cmp::min;
 
 impl CallAuctionPool {
@@ -9,13 +10,21 @@ impl CallAuctionPool {
         }
     }
 
-    pub fn add_order(&mut self, order: OrderRequest) {
+    pub fn add_order(&mut self, order: OrderRequest) -> Result<(), CallAuctionPoolError> {
+        if !order.is_limit() {
+            return Err(CallAuctionPoolError::UnsupportedPriceType {
+                price_type: order.price_type,
+            });
+        }
+
         let resting = order.into_resting_order();
         if resting.is_buy() {
             self.bids.push(resting);
         } else if resting.is_sell() {
             self.asks.push(resting);
         }
+
+        Ok(())
     }
 
     pub fn calculate_match_price_final(&self, price_tick: u64) -> Option<(u64, u32)> {
@@ -53,6 +62,7 @@ impl CallAuctionPool {
         let mut best_price = 0u64;
         let mut max_volume = 0u32;
         let mut min_imbalance = u32::MAX;
+        let mut has_candidate = false;
 
         let mut total_bid_volume: u32 = sorted_bids.iter().map(|o| o.remaining_quantity).sum();
         let mut total_ask_volume: u32 = 0;
@@ -72,20 +82,46 @@ impl CallAuctionPool {
             let current_volume = min(total_bid_volume, total_ask_volume);
             let imbalance = total_bid_volume.abs_diff(total_ask_volume);
 
-            if current_volume > max_volume {
+            if current_volume == 0 {
+                continue;
+            }
+
+            if !has_candidate
+                || current_volume > max_volume
+                || (current_volume == max_volume && imbalance < min_imbalance)
+                || (current_volume == max_volume
+                    && imbalance == min_imbalance
+                    && Self::prefer_price_on_tie(
+                        test_price,
+                        best_price,
+                        total_bid_volume,
+                        total_ask_volume,
+                    ))
+            {
+                has_candidate = true;
                 max_volume = current_volume;
-                best_price = test_price;
-                min_imbalance = imbalance;
-            } else if current_volume == max_volume && max_volume > 0 && imbalance < min_imbalance {
                 best_price = test_price;
                 min_imbalance = imbalance;
             }
         }
 
-        if max_volume > 0 {
+        if has_candidate {
             Some((best_price, max_volume))
         } else {
             None
+        }
+    }
+
+    fn prefer_price_on_tie(
+        candidate_price: u64,
+        current_best_price: u64,
+        total_bid_volume: u32,
+        total_ask_volume: u32,
+    ) -> bool {
+        match total_bid_volume.cmp(&total_ask_volume) {
+            Ordering::Greater => candidate_price > current_best_price,
+            Ordering::Less => candidate_price < current_best_price,
+            Ordering::Equal => candidate_price < current_best_price,
         }
     }
 
@@ -185,5 +221,161 @@ impl CallAuctionPool {
         }
 
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_order(
+        order_id: u64,
+        side: OrderSide,
+        price: u64,
+        quantity: u32,
+        submit_time: u64,
+    ) -> OrderRequest {
+        make_order_with_price_type(order_id, side, PriceType::Limit, price, quantity, submit_time)
+    }
+
+    fn make_order_with_price_type(
+        order_id: u64,
+        side: OrderSide,
+        price_type: PriceType,
+        price: u64,
+        quantity: u32,
+        submit_time: u64,
+    ) -> OrderRequest {
+        OrderRequest {
+            product_id: 7,
+            side,
+            price_type,
+            flags: OrderFlags::default(),
+            quantity,
+            order_id,
+            price,
+            submit_time,
+            expire_time: 0,
+            _padding: [0u8; 24],
+        }
+    }
+
+    #[test]
+    fn calculate_match_price_returns_none_without_crossing_sides_or_tick() {
+        let mut pool = CallAuctionPool::new(4);
+        pool.add_order(make_order(1, OrderSide::Buy, 100, 2, 1)).unwrap();
+        assert_eq!(pool.calculate_match_price_final(1), None);
+
+        pool.add_order(make_order(2, OrderSide::Sell, 100, 2, 2)).unwrap();
+        assert_eq!(pool.calculate_match_price_final(0), None);
+    }
+
+    #[test]
+    fn calculate_match_price_finds_maximum_cross_volume() {
+        let mut pool = CallAuctionPool::new(8);
+        pool.add_order(make_order(1, OrderSide::Buy, 105, 3, 1)).unwrap();
+        pool.add_order(make_order(2, OrderSide::Buy, 100, 2, 2)).unwrap();
+        pool.add_order(make_order(3, OrderSide::Sell, 95, 1, 3)).unwrap();
+        pool.add_order(make_order(4, OrderSide::Sell, 100, 4, 4)).unwrap();
+
+        assert_eq!(pool.calculate_match_price_final(5), Some((100, 5)));
+    }
+
+    #[test]
+    fn calculate_match_price_breaks_full_ties_toward_lower_price_when_balanced() {
+        let mut pool = CallAuctionPool::new(8);
+        pool.add_order(make_order(1, OrderSide::Buy, 110, 5, 1)).unwrap();
+        pool.add_order(make_order(2, OrderSide::Buy, 100, 5, 2)).unwrap();
+        pool.add_order(make_order(3, OrderSide::Sell, 100, 5, 3)).unwrap();
+        pool.add_order(make_order(4, OrderSide::Sell, 110, 5, 4)).unwrap();
+
+        assert_eq!(pool.calculate_match_price_final(10), Some((100, 5)));
+    }
+
+    #[test]
+    fn calculate_match_price_breaks_ties_toward_higher_price_when_buy_surplus_remains() {
+        let mut pool = CallAuctionPool::new(8);
+        pool.add_order(make_order(1, OrderSide::Buy, 120, 5, 1)).unwrap();
+        pool.add_order(make_order(2, OrderSide::Buy, 110, 10, 2)).unwrap();
+        pool.add_order(make_order(3, OrderSide::Sell, 100, 10, 3)).unwrap();
+
+        assert_eq!(pool.calculate_match_price_final(10), Some((110, 10)));
+    }
+
+    #[test]
+    fn execute_auction_preserves_ineligible_orders_and_unfilled_remainders() {
+        let mut pool = CallAuctionPool::new(8);
+        pool.add_order(make_order(1, OrderSide::Buy, 110, 5, 1)).unwrap();
+        pool.add_order(make_order(2, OrderSide::Buy, 90, 3, 2)).unwrap();
+        pool.add_order(make_order(3, OrderSide::Sell, 100, 2, 3)).unwrap();
+        pool.add_order(make_order(4, OrderSide::Sell, 100, 4, 4)).unwrap();
+        pool.add_order(make_order(5, OrderSide::Sell, 120, 6, 5)).unwrap();
+
+        let outcome = pool.execute_auction(10, [0; 16], 7, 123);
+
+        assert_eq!(outcome.start_time, 123);
+        assert_eq!(outcome.end_time, 123);
+        assert_eq!(outcome.total_count(), 2);
+        assert_eq!(outcome.trades[0].buy_order_id, 1);
+        assert_eq!(outcome.trades[0].sell_order_id, 3);
+        assert_eq!(outcome.trades[0].price, 100);
+        assert_eq!(outcome.trades[0].quantity, 2);
+        assert_eq!(outcome.trades[1].buy_order_id, 1);
+        assert_eq!(outcome.trades[1].sell_order_id, 4);
+        assert_eq!(outcome.trades[1].price, 100);
+        assert_eq!(outcome.trades[1].quantity, 3);
+
+        assert_eq!(pool.bids.len(), 1);
+        assert!(pool.bids.iter().any(|order| order.order_id == 2 && order.remaining_quantity == 3));
+        assert!(pool.bids.iter().all(|order| order.order_id != 1));
+
+        assert_eq!(pool.asks.len(), 2);
+        assert!(pool.asks.iter().any(|order| order.order_id == 4 && order.remaining_quantity == 1));
+        assert!(pool.asks.iter().any(|order| order.order_id == 5 && order.remaining_quantity == 6));
+    }
+
+    #[test]
+    fn cancel_order_removes_order_from_either_side() {
+        let mut pool = CallAuctionPool::new(4);
+        pool.add_order(make_order(1, OrderSide::Buy, 100, 2, 1)).unwrap();
+        pool.add_order(make_order(2, OrderSide::Sell, 101, 2, 2)).unwrap();
+
+        assert!(pool.cancel_order(&CancelOrder {
+            product_id: 7,
+            order_id: 1,
+        }));
+        assert!(pool.cancel_order(&CancelOrder {
+            product_id: 7,
+            order_id: 2,
+        }));
+        assert!(!pool.cancel_order(&CancelOrder {
+            product_id: 7,
+            order_id: 3,
+        }));
+        assert!(pool.bids.is_empty());
+        assert!(pool.asks.is_empty());
+    }
+
+    #[test]
+    fn rejects_market_orders_from_entering_call_auction_pool() {
+        let mut pool = CallAuctionPool::new(4);
+
+        let err = pool.add_order(make_order_with_price_type(
+            1,
+            OrderSide::Buy,
+            PriceType::Market,
+            0,
+            5,
+            1,
+        ));
+
+        assert_eq!(
+            err,
+            Err(CallAuctionPoolError::UnsupportedPriceType {
+                price_type: PriceType::Market,
+            })
+        );
+        assert!(pool.bids.is_empty());
+        assert!(pool.asks.is_empty());
     }
 }

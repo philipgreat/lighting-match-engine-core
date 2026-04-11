@@ -126,6 +126,13 @@ This engine is the core of a trading system. You'll need to build the surroundin
 *   Risk Management System
 *   ...and other external systems.
 
+## 📚 Architecture Docs
+
+The current matching-core boundaries, market terms, and session concepts are documented here:
+
+*   [Market Terms And Configuration](/Users/Philip/githome/lighting-match-engine-core/docs/market-terms-and-configuration.md)
+*   [Case Handling Guide](/Users/Philip/githome/lighting-match-engine-core/docs/case-handling-guide.md)
+
 ## 🤝 Contributing
 
 We welcome contributions from the community! Whether you want to fix a bug, add a feature, or improve the documentation, we'd love to have your help.
