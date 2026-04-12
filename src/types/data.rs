@@ -98,6 +98,7 @@ pub struct RestingOrder {
     pub remaining_quantity: u32,
     pub submit_time: u64,
     pub expire_time: u64,
+    pub is_cancelled: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -143,6 +144,12 @@ impl MatchOutcome {
             start_time: 0,
             end_time: 0,
         }
+    }
+
+    pub fn reset(&mut self, start_time: u64) {
+        self.trades.clear();
+        self.start_time = start_time;
+        self.end_time = start_time;
     }
 
     pub fn add_trade(&mut self, trade: Trade) {
@@ -421,6 +428,8 @@ pub struct SparseOrderBook {
     pub bids: BTreeMap<u64, OrdersBucket>,
     pub asks: BTreeMap<u64, OrdersBucket>,
     pub order_map: AHashMap<u64, (bool, u64)>,
+    pub empty_bid_prices_buf: Vec<u64>,
+    pub empty_ask_prices_buf: Vec<u64>,
     pub total_bid_volume: u32,
     pub total_ask_volume: u32,
     pub last_outcome: MatchOutcome,
@@ -430,8 +439,8 @@ pub struct SparseOrderBook {
 }
 
 pub trait OrderBook: Send {
-    fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderBookError>;
-    fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderBookError>;
+    fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderSubmitError>;
+    fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderSubmitError>;
     fn cancel_order(&mut self, order_id: u64) -> bool;
     fn last_outcome(&self) -> &MatchOutcome;
 }
@@ -453,14 +462,14 @@ impl AnyOrderBook {
 }
 
 impl OrderBook for AnyOrderBook {
-    fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderBookError> {
+    fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderSubmitError> {
         match self {
             Self::Dense(book) => book.seed_order(order),
             Self::Sparse(book) => book.seed_order(order),
         }
     }
 
-    fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderBookError> {
+    fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderSubmitError> {
         match self {
             Self::Dense(book) => book.match_order(incoming),
             Self::Sparse(book) => book.match_order(incoming),
@@ -499,6 +508,21 @@ pub struct EngineState {
 pub struct CallAuctionPool {
     pub bids: Vec<RestingOrder>,
     pub asks: Vec<RestingOrder>,
+    pub order_map: AHashMap<u64, (bool, usize)>,
+    pub bid_volume_by_price: BTreeMap<u64, u32>,
+    pub ask_volume_by_price: BTreeMap<u64, u32>,
+    pub raw_prices_buf: Vec<u64>,
+    pub critical_ticks_buf: Vec<u64>,
+    pub bid_levels_buf: Vec<(u64, u32)>,
+    pub ask_levels_buf: Vec<(u64, u32)>,
+    pub eligible_bid_orders_by_price: BTreeMap<u64, Vec<RestingOrder>>,
+    pub eligible_ask_orders_by_price: BTreeMap<u64, Vec<RestingOrder>>,
+    pub drained_bids_buf: Vec<RestingOrder>,
+    pub drained_asks_buf: Vec<RestingOrder>,
+    pub eligible_bids_buf: Vec<RestingOrder>,
+    pub eligible_asks_buf: Vec<RestingOrder>,
+    pub remaining_bids_buf: Vec<RestingOrder>,
+    pub remaining_asks_buf: Vec<RestingOrder>,
 }
 
 #[derive(Debug)]
@@ -544,6 +568,7 @@ impl OrderRequest {
             remaining_quantity: self.quantity,
             submit_time: self.submit_time,
             expire_time: self.expire_time,
+            is_cancelled: false,
         }
     }
 }
@@ -567,5 +592,10 @@ impl RestingOrder {
     #[inline(always)]
     pub fn is_limit(&self) -> bool {
         self.price_type == PriceType::Limit
+    }
+
+    #[inline(always)]
+    pub fn is_active(&self) -> bool {
+        !self.is_cancelled && self.remaining_quantity > 0
     }
 }

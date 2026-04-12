@@ -4,6 +4,16 @@ use crate::timer::HighResolutionTimer;
 use crate::types::*;
 
 impl DenseOrderBook {
+    fn prune_bucket_front(
+        bucket: &mut OrdersBucket,
+        order_map: &mut AHashMap<u64, (bool, usize)>,
+    ) {
+        while matches!(bucket.orders.front(), Some(order) if !order.is_active()) {
+            let removed = bucket.orders.pop_front().unwrap();
+            order_map.remove(&removed.order_id);
+        }
+    }
+
     pub fn new(
         tick: u64,
         base_price: u64,
@@ -75,6 +85,7 @@ impl DenseOrderBook {
     fn advance_best_ask(&mut self) {
         while self.has_asks() {
             let idx = self.best_ask as usize;
+            Self::prune_bucket_front(&mut self.asks[idx], &mut self.order_map);
             if !self.asks[idx].orders.is_empty() {
                 break;
             }
@@ -85,6 +96,7 @@ impl DenseOrderBook {
     fn retreat_best_bid(&mut self) {
         while self.has_bids() {
             let idx = self.best_bid as usize;
+            Self::prune_bucket_front(&mut self.bids[idx], &mut self.order_map);
             if !self.bids[idx].orders.is_empty() {
                 break;
             }
@@ -108,16 +120,30 @@ impl DenseOrderBook {
         }
     }
 
-    pub fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderBookError> {
-        self.validate_price_range(order.price)?;
-        self.validate_price_on_tick(order.price)?;
+    pub fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderSubmitError> {
+        if let Err(source) = self.validate_price_range(order.price) {
+            return Err(OrderSubmitError { order, source });
+        }
+        if let Err(source) = self.validate_price_on_tick(order.price) {
+            return Err(OrderSubmitError { order, source });
+        }
         self.add_resting_order(order.into_resting_order());
         Ok(())
     }
 
-    pub fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderBookError> {
-        self.validate_price_range(incoming.price)?;
-        self.validate_price_on_tick(incoming.price)?;
+    pub fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderSubmitError> {
+        if let Err(source) = self.validate_price_range(incoming.price) {
+            return Err(OrderSubmitError {
+                order: incoming,
+                source,
+            });
+        }
+        if let Err(source) = self.validate_price_on_tick(incoming.price) {
+            return Err(OrderSubmitError {
+                order: incoming,
+                source,
+            });
+        }
         let mut taker = incoming.into_resting_order();
         self.last_outcome.trades.clear();
 #[cfg(feature = "match-timing")]
@@ -148,6 +174,7 @@ impl DenseOrderBook {
         while taker.remaining_quantity > 0 && self.has_asks() {
             let idx = self.best_ask as usize;
             let bucket = &mut self.asks[idx];
+            Self::prune_bucket_front(bucket, &mut self.order_map);
 
             if bucket.orders.is_empty() {
                 self.best_ask += 1;
@@ -191,6 +218,7 @@ impl DenseOrderBook {
         while taker.remaining_quantity > 0 && self.has_bids() {
             let idx = self.best_bid as usize;
             let bucket = &mut self.bids[idx];
+            Self::prune_bucket_front(bucket, &mut self.order_map);
 
             if bucket.orders.is_empty() {
                 self.best_bid -= 1;
@@ -240,16 +268,31 @@ impl DenseOrderBook {
             &mut self.asks[idx]
         };
 
-        if let Some(pos) = bucket.orders.iter().position(|o| o.order_id == order_id) {
-            let removed = bucket.orders.remove(pos).unwrap();
+        let is_front = bucket
+            .orders
+            .front()
+            .map(|order| order.order_id == order_id)
+            .unwrap_or(false);
+
+        if let Some(removed) = bucket.orders.iter_mut().find(|o| o.order_id == order_id) {
             if is_buy {
                 self.total_bid_volume -= removed.remaining_quantity;
+                removed.remaining_quantity = 0;
+                removed.is_cancelled = true;
+                if is_front {
+                    Self::prune_bucket_front(bucket, &mut self.order_map);
+                }
                 if bucket.orders.is_empty() && self.best_bid == idx as isize {
                     self.best_bid -= 1;
                     self.retreat_best_bid();
                 }
             } else {
                 self.total_ask_volume -= removed.remaining_quantity;
+                removed.remaining_quantity = 0;
+                removed.is_cancelled = true;
+                if is_front {
+                    Self::prune_bucket_front(bucket, &mut self.order_map);
+                }
                 if bucket.orders.is_empty() && self.best_ask == idx as isize {
                     self.best_ask += 1;
                     self.advance_best_ask();
@@ -321,7 +364,7 @@ mod tests {
 
         let err = book.seed_order(order(1, OrderSide::Buy, 50, 1)).unwrap_err();
         assert_eq!(
-            err,
+            err.source,
             OrderBookError::PriceOutOfRange {
                 price: 50,
                 min_price: 100,
@@ -336,7 +379,7 @@ mod tests {
 
         let err = book.seed_order(order(1, OrderSide::Buy, 105, 1)).unwrap_err();
         assert_eq!(
-            err,
+            err.source,
             OrderBookError::PriceNotOnTick {
                 price: 105,
                 base_price: 100,

@@ -5,6 +5,16 @@ use crate::timer::HighResolutionTimer;
 use crate::types::*;
 
 impl SparseOrderBook {
+    fn prune_bucket_front(
+        bucket: &mut OrdersBucket,
+        order_map: &mut AHashMap<u64, (bool, u64)>,
+    ) {
+        while matches!(bucket.orders.front(), Some(order) if !order.is_active()) {
+            let removed = bucket.orders.pop_front().unwrap();
+            order_map.remove(&removed.order_id);
+        }
+    }
+
     pub fn new(
         tick: u64,
         base_price: u64,
@@ -15,6 +25,8 @@ impl SparseOrderBook {
             bids: BTreeMap::new(),
             asks: BTreeMap::new(),
             order_map: AHashMap::with_capacity(1024),
+            empty_bid_prices_buf: Vec::with_capacity(64),
+            empty_ask_prices_buf: Vec::with_capacity(64),
             total_bid_volume: 0,
             total_ask_volume: 0,
             last_outcome: MatchOutcome::new(trade_cap),
@@ -24,12 +36,12 @@ impl SparseOrderBook {
         }
     }
 
-    pub fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderBookError> {
+    pub fn seed_order(&mut self, order: OrderRequest) -> Result<(), OrderSubmitError> {
         self.add_resting_order(order.into_resting_order());
         Ok(())
     }
 
-    pub fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderBookError> {
+    pub fn match_order(&mut self, incoming: OrderRequest) -> Result<(), OrderSubmitError> {
         let mut taker = incoming.into_resting_order();
         self.last_outcome.trades.clear();
 #[cfg(feature = "match-timing")]
@@ -63,12 +75,23 @@ impl SparseOrderBook {
         let ladder = if is_buy { &mut self.bids } else { &mut self.asks };
 
         if let Some(bucket) = ladder.get_mut(&price) {
-            if let Some(pos) = bucket.orders.iter().position(|o| o.order_id == order_id) {
-                let removed = bucket.orders.remove(pos).unwrap();
+            let is_front = bucket
+                .orders
+                .front()
+                .map(|order| order.order_id == order_id)
+                .unwrap_or(false);
+
+            if let Some(removed) = bucket.orders.iter_mut().find(|o| o.order_id == order_id) {
                 if is_buy {
                     self.total_bid_volume -= removed.remaining_quantity;
                 } else {
                     self.total_ask_volume -= removed.remaining_quantity;
+                }
+                removed.remaining_quantity = 0;
+                removed.is_cancelled = true;
+
+                if is_front {
+                    Self::prune_bucket_front(bucket, &mut self.order_map);
                 }
 
                 if bucket.orders.is_empty() {
@@ -98,9 +121,10 @@ impl SparseOrderBook {
     }
 
     fn match_buy(&mut self, taker: &mut RestingOrder) {
-        let mut empty_prices = Vec::new();
+        self.empty_ask_prices_buf.clear();
 
         for (&price, bucket) in self.asks.iter_mut() {
+            Self::prune_bucket_front(bucket, &mut self.order_map);
             if taker.remaining_quantity == 0 || (taker.is_limit() && taker.price < price) {
                 break;
             }
@@ -116,19 +140,20 @@ impl SparseOrderBook {
             );
 
             if bucket.orders.is_empty() {
-                empty_prices.push(price);
+                self.empty_ask_prices_buf.push(price);
             }
         }
 
-        for price in empty_prices {
+        for price in self.empty_ask_prices_buf.drain(..) {
             self.asks.remove(&price);
         }
     }
 
     fn match_sell(&mut self, taker: &mut RestingOrder) {
-        let mut empty_prices = Vec::new();
+        self.empty_bid_prices_buf.clear();
 
         for (&price, bucket) in self.bids.iter_mut().rev() {
+            Self::prune_bucket_front(bucket, &mut self.order_map);
             if taker.remaining_quantity == 0 || (taker.is_limit() && taker.price > price) {
                 break;
             }
@@ -144,11 +169,11 @@ impl SparseOrderBook {
             );
 
             if bucket.orders.is_empty() {
-                empty_prices.push(price);
+                self.empty_bid_prices_buf.push(price);
             }
         }
 
-        for price in empty_prices {
+        for price in self.empty_bid_prices_buf.drain(..) {
             self.bids.remove(&price);
         }
     }

@@ -88,7 +88,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => {
             eprintln!("Configuration Error: {}", e);
             eprintln!(
-                "Usage: --name <tag_16_chars_max> --prodid <u16> [--test-order-book-size 10k] [--order-book dense|sparse] [--tick N] [--base-price N] [--max-levels N] [--trade-cap N]"
+                "Usage: --name <tag_16_chars_max> --prodid <u16> [--test-order-book-size 10k] [--order-book dense|sparse] [--tick N] [--base-price N] [--max-levels N] [--trade-cap N] [--bench-call-auction] [--bench-call-auction-only]"
             );
             return Err(e.into());
         }
@@ -109,8 +109,17 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "  Test order book size: {} bids and {}  asks repectively",
         app_config.test_order_book_size, app_config.test_order_book_size
     );
+    println!(
+        "  Call auction benchmark: run={} only={}",
+        app_config.run_call_auction_benchmark, app_config.benchmark_only
+    );
 
     print_separator(100);
+
+    if app_config.benchmark_only {
+        run_call_auction_benchmark(app_config.order_book.tick.max(1))?;
+        return Ok(());
+    }
 
     set_core(0);
 
@@ -122,8 +131,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let session_summary = run_demo_session(&mut engine_state, app_config.order_book.tick, 1_000, 9_000)
         .map_err(|err| handle_trading_session_error(instance_tag_bytes, err))?;
     print_centered_line("Opening call auction", '-', 80);
-    show_result(session_summary.opening_auction.clone());
-    if let Some(closing_auction) = session_summary.closing_auction.clone() {
+    show_result(&session_summary.opening_auction);
+    if let Some(closing_auction) = session_summary.closing_auction.as_ref() {
         print_centered_line("Closing call auction", '-', 80);
         show_result(closing_auction);
     }
@@ -228,7 +237,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "Speed  : {:>15} match results/sec.\n",
         ((1_000_000_000) * (2 * count) / (end - start)).separated_string()
     );
-    let last_result = engine_state.order_book.last_outcome().clone();
+    let last_result = engine_state.order_book.last_outcome();
     //println!("result {:?}", engine_state.order_book.last_outcome());
 
     print_centered_line("Last match result", '-', 80);
@@ -248,6 +257,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("数据为空，无法统计");
     }
+
+    if app_config.run_call_auction_benchmark {
+        run_call_auction_benchmark(app_config.order_book.tick.max(1))?;
+    }
     print_separator(100);
 
     stats::save_perf_to_file(&perf_data)?;
@@ -256,6 +269,36 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     // engine_state.order_book.last_outcome().trades.iter().for_each(|oe|{
     //     println!("{:?}",oe);
     // });
+
+    Ok(())
+}
+
+fn run_call_auction_benchmark(price_tick: u64) -> Result<(), Box<dyn std::error::Error>> {
+    const ORDER_COUNT_PER_SIDE: usize = 2_000;
+    const ITERATIONS: usize = 200;
+
+    let (concentrated_bench, distributed_bench) =
+        stats::benchmark_call_auction_profiles(ORDER_COUNT_PER_SIDE, ITERATIONS, price_tick);
+    let output_path = stats::save_call_auction_benchmark_to_file(
+        ORDER_COUNT_PER_SIDE,
+        ITERATIONS,
+        price_tick,
+        concentrated_bench,
+        distributed_bench,
+    )?;
+
+    print_centered_line("Call auction benchmark", '-', 80);
+    println!(
+        "Concentrated levels: total={}ns per_run={}ns",
+        concentrated_bench.total_ns,
+        concentrated_bench.per_run_ns
+    );
+    println!(
+        "Distributed levels : total={}ns per_run={}ns",
+        distributed_bench.total_ns,
+        distributed_bench.per_run_ns
+    );
+    println!("Saved benchmark to {}", output_path);
 
     Ok(())
 }

@@ -40,14 +40,14 @@ fn run_call_auction_session(
     kind: AuctionKind,
     tick: u64,
     current_ts: u64,
-    orders: &[OrderRequest],
+    orders: impl IntoIterator<Item = OrderRequest>,
     next_phase: MarketPhase,
 ) -> Result<MatchOutcome, TradingSessionError> {
     engine_state
         .transition_to(MarketPhase::AuctionOrderEntry(kind), current_ts)
         .map_err(TradingSessionError::Transition)?;
 
-    for order in orders.iter().cloned() {
+    for order in orders {
         engine_state.submit_order(order).map_err(map_submit_error)?;
     }
 
@@ -58,8 +58,11 @@ fn run_call_auction_session(
         .transition_to(MarketPhase::AuctionMatching(kind), current_ts + 20)
         .map_err(TradingSessionError::Transition)?;
 
-    let outcome = engine_state
+    engine_state
         .execute_active_auction(tick, current_ts + 30)
+        .map_err(TradingSessionError::Transition)?;
+    let outcome = engine_state
+        .take_active_auction_outcome()
         .map_err(TradingSessionError::Transition)?;
 
     engine_state
@@ -107,7 +110,7 @@ pub fn run_opening_call_auction(
         AuctionKind::Opening,
         tick,
         current_ts,
-        &opening_orders,
+        opening_orders,
         MarketPhase::ContinuousTrading,
     )
 }
@@ -154,7 +157,7 @@ pub fn run_closing_call_auction(
         AuctionKind::Closing,
         tick,
         current_ts,
-        &closing_orders,
+        closing_orders,
         MarketPhase::Closed,
     )?;
 

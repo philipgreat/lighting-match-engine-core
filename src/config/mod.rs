@@ -21,6 +21,8 @@ pub struct AppConfig {
     pub product_id: u16,
     pub test_order_book_size: u32,
     pub order_book: OrderBookConfig,
+    pub run_call_auction_benchmark: bool,
+    pub benchmark_only: bool,
 }
 
 fn validate_order_book_config(config: OrderBookConfig) -> Result<OrderBookConfig, String> {
@@ -91,6 +93,8 @@ pub fn get_config() -> Result<AppConfig, String> {
     let mut order_book_base_price = None;
     let mut order_book_max_levels = None;
     let mut order_book_trade_cap = None;
+    let mut run_call_auction_benchmark = None;
+    let mut benchmark_only = None;
 
     // Command Line Arguments Parsing
     let mut i = 1;
@@ -150,6 +154,13 @@ pub fn get_config() -> Result<AppConfig, String> {
                     order_book_trade_cap = Some(args[i + 1].clone());
                     i += 1;
                 }
+            }
+            "--bench-call-auction" => {
+                run_call_auction_benchmark = Some(true);
+            }
+            "--bench-call-auction-only" => {
+                run_call_auction_benchmark = Some(true);
+                benchmark_only = Some(true);
             }
             _ => {}
         }
@@ -252,6 +263,20 @@ pub fn get_config() -> Result<AppConfig, String> {
         product_id: prod_id,
         test_order_book_size,
         order_book,
+        run_call_auction_benchmark: run_call_auction_benchmark
+            .or_else(|| {
+                std::env::var("BENCH_CALL_AUCTION")
+                    .ok()
+                    .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+            })
+            .unwrap_or(false),
+        benchmark_only: benchmark_only
+            .or_else(|| {
+                std::env::var("BENCH_CALL_AUCTION_ONLY")
+                    .ok()
+                    .map(|v| matches!(v.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+            })
+            .unwrap_or(false),
     })
 }
 

@@ -3,79 +3,160 @@ use std::cmp::Ordering;
 use std::cmp::min;
 
 impl CallAuctionPool {
+    fn add_volume(volume_map: &mut std::collections::BTreeMap<u64, u32>, price: u64, qty: u32) {
+        *volume_map.entry(price).or_insert(0) += qty;
+    }
+
+    fn subtract_volume(
+        volume_map: &mut std::collections::BTreeMap<u64, u32>,
+        price: u64,
+        qty: u32,
+    ) {
+        if let Some(level_qty) = volume_map.get_mut(&price) {
+            *level_qty -= qty;
+            if *level_qty == 0 {
+                volume_map.remove(&price);
+            }
+        }
+    }
+
+    pub(crate) fn rebuild_price_levels(&mut self) {
+        self.order_map.clear();
+        self.bid_volume_by_price.clear();
+        self.ask_volume_by_price.clear();
+
+        for (idx, order) in self.bids.iter().enumerate() {
+            if order.is_active() {
+                self.order_map.insert(order.order_id, (true, idx));
+                Self::add_volume(&mut self.bid_volume_by_price, order.price, order.remaining_quantity);
+            }
+        }
+
+        for (idx, order) in self.asks.iter().enumerate() {
+            if order.is_active() {
+                self.order_map.insert(order.order_id, (false, idx));
+                Self::add_volume(&mut self.ask_volume_by_price, order.price, order.remaining_quantity);
+            }
+        }
+    }
+
+    fn sort_eligible_levels(levels: &mut std::collections::BTreeMap<u64, Vec<RestingOrder>>) {
+        for orders in levels.values_mut() {
+            orders.sort_by_key(|order| order.submit_time);
+        }
+    }
+
     pub fn new(init_size: usize) -> Self {
         Self {
             bids: Vec::with_capacity(init_size),
             asks: Vec::with_capacity(init_size),
+            order_map: ahash::AHashMap::with_capacity(init_size),
+            bid_volume_by_price: std::collections::BTreeMap::new(),
+            ask_volume_by_price: std::collections::BTreeMap::new(),
+            raw_prices_buf: Vec::with_capacity(init_size * 2),
+            critical_ticks_buf: Vec::with_capacity(init_size * 4),
+            bid_levels_buf: Vec::with_capacity(init_size),
+            ask_levels_buf: Vec::with_capacity(init_size),
+            eligible_bid_orders_by_price: std::collections::BTreeMap::new(),
+            eligible_ask_orders_by_price: std::collections::BTreeMap::new(),
+            drained_bids_buf: Vec::with_capacity(init_size),
+            drained_asks_buf: Vec::with_capacity(init_size),
+            eligible_bids_buf: Vec::with_capacity(init_size),
+            eligible_asks_buf: Vec::with_capacity(init_size),
+            remaining_bids_buf: Vec::with_capacity(init_size),
+            remaining_asks_buf: Vec::with_capacity(init_size),
         }
     }
 
-    pub fn add_order(&mut self, order: OrderRequest) -> Result<(), CallAuctionPoolError> {
+    pub fn add_order(&mut self, order: OrderRequest) -> Result<(), CallAuctionOrderSubmitError> {
         if !order.is_limit() {
-            return Err(CallAuctionPoolError::UnsupportedPriceType {
-                price_type: order.price_type,
+            let price_type = order.price_type;
+            return Err(CallAuctionOrderSubmitError {
+                order,
+                source: CallAuctionPoolError::UnsupportedPriceType {
+                    price_type,
+                },
             });
         }
 
         let resting = order.into_resting_order();
         if resting.is_buy() {
+            Self::add_volume(
+                &mut self.bid_volume_by_price,
+                resting.price,
+                resting.remaining_quantity,
+            );
+            self.order_map.insert(resting.order_id, (true, self.bids.len()));
             self.bids.push(resting);
         } else if resting.is_sell() {
+            Self::add_volume(
+                &mut self.ask_volume_by_price,
+                resting.price,
+                resting.remaining_quantity,
+            );
+            self.order_map.insert(resting.order_id, (false, self.asks.len()));
             self.asks.push(resting);
         }
 
         Ok(())
     }
 
-    pub fn calculate_match_price_final(&self, price_tick: u64) -> Option<(u64, u32)> {
+    pub fn calculate_match_price_final(&mut self, price_tick: u64) -> Option<(u64, u32)> {
         if self.bids.is_empty() || self.asks.is_empty() || price_tick == 0 {
             return None;
         }
 
-        let mut raw_prices: Vec<u64> = self
-            .bids
-            .iter()
-            .map(|o| o.price)
-            .chain(self.asks.iter().map(|o| o.price))
-            .collect();
-        raw_prices.sort_unstable();
-        raw_prices.dedup();
+        self.raw_prices_buf.clear();
+        self.raw_prices_buf.extend(self.bid_volume_by_price.keys().copied());
+        self.raw_prices_buf.extend(self.ask_volume_by_price.keys().copied());
+        if self.raw_prices_buf.is_empty() {
+            return None;
+        }
+        self.raw_prices_buf.sort_unstable();
+        self.raw_prices_buf.dedup();
 
-        let mut critical_ticks = Vec::new();
-        for price in raw_prices {
+        self.critical_ticks_buf.clear();
+        for &price in &self.raw_prices_buf {
             let base = (price / price_tick) * price_tick;
-            critical_ticks.push(base);
-            critical_ticks.push(base + price_tick);
+            self.critical_ticks_buf.push(base);
+            self.critical_ticks_buf.push(base + price_tick);
             if base >= price_tick {
-                critical_ticks.push(base - price_tick);
+                self.critical_ticks_buf.push(base - price_tick);
             }
         }
-        critical_ticks.sort_unstable();
-        critical_ticks.dedup();
+        self.critical_ticks_buf.sort_unstable();
+        self.critical_ticks_buf.dedup();
 
-        let mut sorted_bids = self.bids.clone();
-        sorted_bids.sort_by(|a, b| b.price.cmp(&a.price));
-
-        let mut sorted_asks = self.asks.clone();
-        sorted_asks.sort_by(|a, b| a.price.cmp(&b.price));
+        self.bid_levels_buf.clear();
+        self.bid_levels_buf
+            .extend(self.bid_volume_by_price.iter().rev().map(|(&price, &qty)| (price, qty)));
+        self.ask_levels_buf.clear();
+        self.ask_levels_buf
+            .extend(self.ask_volume_by_price.iter().map(|(&price, &qty)| (price, qty)));
 
         let mut best_price = 0u64;
         let mut max_volume = 0u32;
         let mut min_imbalance = u32::MAX;
         let mut has_candidate = false;
 
-        let mut total_bid_volume: u32 = sorted_bids.iter().map(|o| o.remaining_quantity).sum();
+        let mut total_bid_volume: u32 = self
+            .bid_levels_buf
+            .iter()
+            .map(|(_, qty)| *qty)
+            .sum();
         let mut total_ask_volume: u32 = 0;
         let mut ask_idx = 0;
-        let mut bid_ptr = sorted_bids.len();
+        let mut bid_ptr = self.bid_levels_buf.len();
 
-        for &test_price in &critical_ticks {
-            while bid_ptr > 0 && sorted_bids[bid_ptr - 1].price < test_price {
-                total_bid_volume -= sorted_bids[bid_ptr - 1].remaining_quantity;
+        for &test_price in &self.critical_ticks_buf {
+            while bid_ptr > 0 && self.bid_levels_buf[bid_ptr - 1].0 < test_price {
+                total_bid_volume -= self.bid_levels_buf[bid_ptr - 1].1;
                 bid_ptr -= 1;
             }
-            while ask_idx < sorted_asks.len() && sorted_asks[ask_idx].price <= test_price {
-                total_ask_volume += sorted_asks[ask_idx].remaining_quantity;
+            while ask_idx < self.ask_levels_buf.len()
+                && self.ask_levels_buf[ask_idx].0 <= test_price
+            {
+                total_ask_volume += self.ask_levels_buf[ask_idx].1;
                 ask_idx += 1;
             }
 
@@ -125,46 +206,110 @@ impl CallAuctionPool {
         }
     }
 
-    pub fn execute_auction(
+    pub fn execute_auction_into(
         &mut self,
+        outcome: &mut MatchOutcome,
         price_tick: u64,
         _instance_tag: [u8; 16],
         _product_id: u16,
         current_ts: u64,
-    ) -> MatchOutcome {
-        let mut outcome = MatchOutcome {
-            trades: Vec::new(),
-            start_time: current_ts,
-            end_time: current_ts,
-        };
+    ) {
+        outcome.reset(current_ts);
 
         let (match_price, mut total_volume_to_match) = match self.calculate_match_price_final(price_tick) {
             Some(result) => result,
-            None => return outcome,
+            None => return,
         };
 
-        let drained_bids: Vec<_> = self.bids.drain(..).collect();
-        let (mut eligible_bids, remaining_bids): (Vec<_>, Vec<_>) = drained_bids
-            .into_iter()
-            .partition(|o| o.price >= match_price);
-        eligible_bids.sort_by(|a, b| b.price.cmp(&a.price).then(a.submit_time.cmp(&b.submit_time)));
+        self.drained_bids_buf.clear();
+        self.drained_bids_buf.extend(self.bids.drain(..));
+        self.eligible_bid_orders_by_price.clear();
+        self.remaining_bids_buf.clear();
+        for order in self.drained_bids_buf.drain(..) {
+            if !order.is_active() {
+                continue;
+            }
+            if order.price >= match_price {
+                self.eligible_bid_orders_by_price
+                    .entry(order.price)
+                    .or_default()
+                    .push(order);
+            } else {
+                self.remaining_bids_buf.push(order);
+            }
+        }
+        Self::sort_eligible_levels(&mut self.eligible_bid_orders_by_price);
 
-        let drained_asks: Vec<_> = self.asks.drain(..).collect();
-        let (mut eligible_asks, remaining_asks): (Vec<_>, Vec<_>) = drained_asks
-            .into_iter()
-            .partition(|o| o.price <= match_price);
-        eligible_asks.sort_by(|a, b| a.price.cmp(&b.price).then(a.submit_time.cmp(&b.submit_time)));
+        self.drained_asks_buf.clear();
+        self.drained_asks_buf.extend(self.asks.drain(..));
+        self.eligible_ask_orders_by_price.clear();
+        self.remaining_asks_buf.clear();
+        for order in self.drained_asks_buf.drain(..) {
+            if !order.is_active() {
+                continue;
+            }
+            if order.price <= match_price {
+                self.eligible_ask_orders_by_price
+                    .entry(order.price)
+                    .or_default()
+                    .push(order);
+            } else {
+                self.remaining_asks_buf.push(order);
+            }
+        }
+        Self::sort_eligible_levels(&mut self.eligible_ask_orders_by_price);
 
-        let mut bid_idx = 0;
-        let mut ask_idx = 0;
+        let bid_prices_desc: Vec<u64> = self
+            .eligible_bid_orders_by_price
+            .keys()
+            .copied()
+            .rev()
+            .collect();
+        let ask_prices_asc: Vec<u64> = self
+            .eligible_ask_orders_by_price
+            .keys()
+            .copied()
+            .collect();
+        let mut bid_level_idx = 0usize;
+        let mut ask_level_idx = 0usize;
+        let mut bid_order_idx = 0usize;
+        let mut ask_order_idx = 0usize;
 
-        while bid_idx < eligible_bids.len()
-            && ask_idx < eligible_asks.len()
+        while bid_level_idx < bid_prices_desc.len()
+            && ask_level_idx < ask_prices_asc.len()
             && total_volume_to_match > 0
         {
-            let bid = &mut eligible_bids[bid_idx];
-            let ask = &mut eligible_asks[ask_idx];
+            let bid_price = bid_prices_desc[bid_level_idx];
+            let ask_price = ask_prices_asc[ask_level_idx];
 
+            let bid_orders = self
+                .eligible_bid_orders_by_price
+                .get_mut(&bid_price)
+                .expect("bid level must exist");
+            while bid_order_idx < bid_orders.len() && bid_orders[bid_order_idx].remaining_quantity == 0 {
+                bid_order_idx += 1;
+            }
+            if bid_order_idx >= bid_orders.len() {
+                bid_level_idx += 1;
+                bid_order_idx = 0;
+                continue;
+            }
+
+            let ask_orders = self
+                .eligible_ask_orders_by_price
+                .get_mut(&ask_price)
+                .expect("ask level must exist");
+            while ask_order_idx < ask_orders.len() && ask_orders[ask_order_idx].remaining_quantity == 0 {
+                ask_order_idx += 1;
+            }
+            if ask_order_idx >= ask_orders.len() {
+                ask_level_idx += 1;
+                ask_order_idx = 0;
+                continue;
+            }
+
+            let bid = &mut bid_orders[bid_order_idx];
+            let ask = &mut ask_orders[ask_order_idx];
             let match_qty = min(
                 bid.remaining_quantity,
                 min(ask.remaining_quantity, total_volume_to_match),
@@ -186,37 +331,87 @@ impl CallAuctionPool {
             }
 
             if bid.remaining_quantity == 0 {
-                bid_idx += 1;
+                bid_order_idx += 1;
             }
             if ask.remaining_quantity == 0 {
-                ask_idx += 1;
+                ask_order_idx += 1;
             }
         }
 
-        self.bids.extend(remaining_bids);
-        self.bids
-            .extend(eligible_bids.into_iter().filter(|o| o.remaining_quantity > 0));
-        self.asks.extend(remaining_asks);
-        self.asks
-            .extend(eligible_asks.into_iter().filter(|o| o.remaining_quantity > 0));
+        self.bids.extend(self.remaining_bids_buf.drain(..));
+        for (_, orders) in self.eligible_bid_orders_by_price.iter_mut().rev() {
+            for order in orders.drain(..) {
+                if order.remaining_quantity > 0 {
+                    self.bids.push(order);
+                }
+            }
+        }
+        self.asks.extend(self.remaining_asks_buf.drain(..));
+        for orders in self.eligible_ask_orders_by_price.values_mut() {
+            for order in orders.drain(..) {
+                if order.remaining_quantity > 0 {
+                    self.asks.push(order);
+                }
+            }
+        }
+        self.rebuild_price_levels();
 
         outcome.end_time = current_ts;
+    }
+
+    pub fn execute_auction(
+        &mut self,
+        price_tick: u64,
+        instance_tag: [u8; 16],
+        product_id: u16,
+        current_ts: u64,
+    ) -> MatchOutcome {
+        let mut outcome = MatchOutcome::new(self.eligible_bids_buf.capacity().min(self.eligible_asks_buf.capacity()));
+        self.execute_auction_into(&mut outcome, price_tick, instance_tag, product_id, current_ts);
         outcome
     }
 
     pub fn clear(&mut self) {
         self.bids.clear();
         self.asks.clear();
+        self.order_map.clear();
+        self.bid_volume_by_price.clear();
+        self.ask_volume_by_price.clear();
     }
 
     pub fn cancel_order(&mut self, cancel: &CancelOrder) -> bool {
-        if let Some(pos) = self.bids.iter().position(|o| o.order_id == cancel.order_id) {
-            self.bids.remove(pos);
-            return true;
-        }
+        let (is_buy, idx) = match self.order_map.remove(&cancel.order_id) {
+            Some(v) => v,
+            None => return false,
+        };
+        let orders = if is_buy {
+            &mut self.bids
+        } else {
+            &mut self.asks
+        };
 
-        if let Some(pos) = self.asks.iter().position(|o| o.order_id == cancel.order_id) {
-            self.asks.remove(pos);
+        if idx < orders.len() && orders[idx].order_id == cancel.order_id && orders[idx].is_active() {
+            let removed = orders.swap_remove(idx);
+            debug_assert_eq!(removed.order_id, cancel.order_id);
+            if is_buy {
+                Self::subtract_volume(
+                    &mut self.bid_volume_by_price,
+                    removed.price,
+                    removed.remaining_quantity,
+                );
+            } else {
+                Self::subtract_volume(
+                    &mut self.ask_volume_by_price,
+                    removed.price,
+                    removed.remaining_quantity,
+                );
+            }
+
+            if idx < orders.len() {
+                let moved = &orders[idx];
+                self.order_map.insert(moved.order_id, (is_buy, idx));
+            }
+
             return true;
         }
 
@@ -367,13 +562,16 @@ mod tests {
             0,
             5,
             1,
-        ));
+        ))
+        .unwrap_err();
 
+        assert_eq!(err.order.order_id, 1);
+        assert_eq!(err.order.price_type, PriceType::Market);
         assert_eq!(
-            err,
-            Err(CallAuctionPoolError::UnsupportedPriceType {
+            err.source,
+            CallAuctionPoolError::UnsupportedPriceType {
                 price_type: PriceType::Market,
-            })
+            }
         );
         assert!(pool.bids.is_empty());
         assert!(pool.asks.is_empty());

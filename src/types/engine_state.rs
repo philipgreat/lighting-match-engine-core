@@ -6,6 +6,7 @@ use crate::types::{
 };
 
 use std::sync::Arc;
+use std::mem;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 impl EngineState {
@@ -48,10 +49,7 @@ impl EngineState {
 
     pub fn match_order(&mut self, new_order: OrderRequest) -> Result<(), OrderSubmitError> {
         self.total_received_orders += 1;
-        self.order_book.match_order(new_order.clone()).map_err(|source| OrderSubmitError {
-            order: new_order,
-            source,
-        })?;
+        self.order_book.match_order(new_order)?;
         self.matched_orders += self.order_book.last_outcome().total_count() as u64;
         Ok(())
     }
@@ -125,37 +123,33 @@ impl EngineState {
         self.active_auction_mut(self.phase)
             .expect("queue_call_auction_order requires an active auction session")
             .pool
-            .add_order(new_order.clone())
-            .map_err(|source| CallAuctionOrderSubmitError {
-                order: new_order,
-                source,
-            })
+            .add_order(new_order)
     }
 
     pub fn execute_call_auction(
         &mut self,
         price_tick: u64,
         current_ts: u64,
-    ) -> Result<MatchOutcome, PhaseTransitionError> {
+    ) -> Result<&MatchOutcome, PhaseTransitionError> {
         match self.phase {
             MarketPhase::AuctionMatching(kind) => {
                 let instance_tag = self.instance_tag;
                 let product_id = self.product_id;
-                let outcome = {
+                let trade_count = {
                     let session = self.active_auction_mut(MarketPhase::AuctionMatching(kind))?;
-                    let outcome = session.pool.execute_auction(
+                    session.pool.execute_auction_into(
+                        &mut session.last_outcome,
                         price_tick,
                         instance_tag,
                         product_id,
                         current_ts,
                     );
                     session.matched_at = Some(current_ts);
-                    session.last_outcome = outcome.clone();
-                    outcome
+                    session.last_outcome.total_count() as u64
                 };
 
-                self.matched_orders += outcome.total_count() as u64;
-                Ok(outcome)
+                self.matched_orders += trade_count;
+                Ok(&self.active_auction().unwrap().last_outcome)
             }
             phase => Err(PhaseTransitionError::InvalidPhaseForAuctionExecution { phase }),
         }
@@ -215,24 +209,28 @@ impl EngineState {
         &mut self,
         price_tick: u64,
         current_ts: u64,
-    ) -> Result<MatchOutcome, PhaseTransitionError> {
+    ) -> Result<&MatchOutcome, PhaseTransitionError> {
         self.execute_call_auction(price_tick, current_ts)
+    }
+
+    pub fn take_active_auction_outcome(&mut self) -> Result<MatchOutcome, PhaseTransitionError> {
+        match self.phase {
+            MarketPhase::AuctionMatching(kind) => {
+                let session = self.active_auction_mut(MarketPhase::AuctionMatching(kind))?;
+                Ok(mem::replace(&mut session.last_outcome, MatchOutcome::new(0)))
+            }
+            phase => Err(PhaseTransitionError::InvalidPhaseForAuctionExecution { phase }),
+        }
     }
 
     pub fn load_sample_test_book(&mut self, test_order_book_size: u32) -> Result<(), OrderSubmitError> {
         for i in 0..test_order_book_size {
             let order = self.create_buy_order(i);
-            self.order_book.seed_order(order.clone()).map_err(|source| OrderSubmitError {
-                order,
-                source,
-            })?;
+            self.order_book.seed_order(order)?;
         }
         for i in 0..test_order_book_size {
             let order = self.create_sell_order(i, test_order_book_size);
-            self.order_book.seed_order(order.clone()).map_err(|source| OrderSubmitError {
-                order,
-                source,
-            })?;
+            self.order_book.seed_order(order)?;
         }
         Ok(())
     }

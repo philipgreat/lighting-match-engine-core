@@ -167,13 +167,14 @@ pub fn serialize_order_book_error_reply(reply: &OrderBookErrorReply) -> [u8; MES
     buf
 }
 
-pub fn serialize_match_outcome(
+pub fn serialize_match_outcome_into(
     instance_tag: [u8; 16],
     outcome: &MatchOutcome,
-) -> Vec<Vec<u8>> {
+    batches: &mut Vec<Vec<u8>>,
+) {
     const BATCH_SIZE: usize = 20;
 
-    let mut batches = Vec::new();
+    batches.clear();
     let shared_internal_match_time = outcome.time_per_trade();
 
     for chunk in outcome.trades.chunks(BATCH_SIZE) {
@@ -190,7 +191,14 @@ pub fn serialize_match_outcome(
         }
         batches.push(buf);
     }
+}
 
+pub fn serialize_match_outcome(
+    instance_tag: [u8; 16],
+    outcome: &MatchOutcome,
+) -> Vec<Vec<u8>> {
+    let mut batches = Vec::new();
+    serialize_match_outcome_into(instance_tag, outcome, &mut batches);
     batches
 }
 
@@ -275,7 +283,7 @@ pub fn deserialize_cancel_order(payload: &[u8]) -> Result<CancelOrder, &'static 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{OrderBookError, OrderFlags, OrderRequest, OrderSide, OrderSubmitError, PriceType};
+    use crate::types::{MatchOutcome, OrderBookError, OrderFlags, OrderRequest, OrderSide, OrderSubmitError, PriceType, Trade};
 
     fn sample_order() -> OrderRequest {
         OrderRequest {
@@ -345,5 +353,37 @@ mod tests {
         assert_eq!(u16::from_be_bytes([buf[28], buf[29]]), 1002);
         assert_eq!(u16::from_be_bytes([buf[18], buf[19]]), 7);
         assert_eq!(u64::from_be_bytes(buf[20..28].try_into().unwrap()), 42);
+    }
+
+    #[test]
+    fn serialize_match_outcome_into_reuses_output_container_shape() {
+        let outcome = MatchOutcome {
+            trades: vec![
+                Trade {
+                    product_id: 7,
+                    buy_order_id: 1,
+                    sell_order_id: 2,
+                    price: 100,
+                    quantity: 3,
+                    involves_mock_order: false,
+                },
+                Trade {
+                    product_id: 7,
+                    buy_order_id: 3,
+                    sell_order_id: 4,
+                    price: 101,
+                    quantity: 5,
+                    involves_mock_order: false,
+                },
+            ],
+            start_time: 0,
+            end_time: 20,
+        };
+
+        let expected = serialize_match_outcome(*b"engine-instance!", &outcome);
+        let mut batches = vec![vec![1, 2, 3]];
+        serialize_match_outcome_into(*b"engine-instance!", &outcome, &mut batches);
+
+        assert_eq!(batches, expected);
     }
 }

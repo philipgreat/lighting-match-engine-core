@@ -4,7 +4,7 @@ pub fn print_separator(eq_len: usize) {
     println!("\n{}\n", "=".repeat(eq_len));
 }
 
-pub fn show_result(result: MatchOutcome) {
+pub fn show_result(result: &MatchOutcome) {
     if result.trades.is_empty() {
         return;
     }
