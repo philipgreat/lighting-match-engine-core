@@ -13,7 +13,7 @@ It's a focused, no-frills engine that you can build upon. Each instance serves a
 ## 🚀 Why Choose Lighting Match Engine Core?
 
 *   **⚡️ Blazing Fast:** Written in Rust, it's designed for performance. We're talking nanosecond-level precision.
-*   **💪 Reliable:** With minimal dependencies (only Tokio for networking), the engine is incredibly stable.
+*   **💪 Lean Runtime:** The current repo keeps dependencies minimal and focuses on in-memory matching logic, order-book structures, and benchmarking utilities.
 *   **💡 Simple & Focused:** It does one thing and does it well: matching. No unnecessary features, no bloat.
 *   **🌐 Universal:** Use it for a wide range of products:
     *   Stocks & Cryptocurrencies
@@ -24,12 +24,18 @@ It's a focused, no-frills engine that you can build upon. Each instance serves a
 
 ## ✨ Key Features
 
-*   **Order Types:** Market and Limit orders.
-*   **Matching Policies:** Price-first, time-first.
-*   **High Precision:** Time is measured in nanoseconds.
-*   **Lean & Mean:** 64-byte package size for efficient network communication.
-*   **In-Memory Processing:** All operations happen in memory for maximum speed.
-*   **UDP Multicast:** Orders are received via UDP multicast for low-latency communication.
+*   **Two In-Memory Books:** Choose between `dense` and `sparse` order book implementations at startup.
+*   **Continuous Matching:** Buy and sell orders are matched in memory with price/time priority behavior in the order book implementations.
+*   **Call Auctions:** Opening and optional closing auction flows are implemented through `SessionRunner` and `CallAuctionPool`.
+*   **Order Price Modes:** Shared order types support both market and limit price modes; call auction entry currently accepts limit orders only.
+*   **Wire Codec:** Submit, cancel, trade, stats, and reject messages are encoded into fixed 64-byte packets.
+*   **Built-In Benchmarks:** `match-timing` latency measurement and call-auction benchmark paths are included in the executable and stats modules.
+*   **Configurable Runtime:** CLI flags control product ID, instance name, test book size, book type, tick, base price, max levels, and trade cap.
+*   **CPU Affinity Support:** The runtime can pin the matching thread to a CPU core via the cross-platform `cpu_affinity` module.
+
+## 📄 Project Summary
+
+*   One-page PDF summary: [lighting-match-engine-core-summary.pdf](/Users/Philip/githome/lighting-match-engine-core/output/pdf/lighting-match-engine-core-summary.pdf)
 
 ## 🛠️ Quick Start
 
@@ -47,7 +53,7 @@ Get up and running in minutes!
     cargo run --features match-timing --release -- --prodid 7 --name AAPL --test-order-book-size 50k
     ```
 
-    This command starts an engine instance for product `7` with the tag `FIX009` and a test order book of 10,000 buy and sell orders.
+    This command starts a demo/benchmark run for product `7` with instance tag `AAPL` and seeds a test order book with `50k` bids and `50k` asks.
 
 2.  **See the Magic:**
 
@@ -105,10 +111,11 @@ Get up and running in minutes!
 
 The engine follows a simple, robust workflow:
 
-1.  **Rebuild Order Book:** The order book is rebuilt from an order book fuel server (not included in this project).
-2.  **Receive Orders:** The engine listens for incoming order requests via UDP.
-3.  **Match Orders:** The core matching logic is executed.
-4.  **Broadcast Results:** Matching results are broadcast to the network.
+1.  **Parse Config:** `config::get_config()` reads CLI flags and selected environment variables into `AppConfig`.
+2.  **Build Order Book:** `orderbook::factory::build_order_book()` creates either a dense or sparse in-memory book.
+3.  **Run Demo Session:** `system::run_demo_session()` drives opening auction, continuous trading, and optional closing auction transitions through `EngineState`.
+4.  **Seed and Benchmark:** `main.rs` seeds a sample book, submits benchmark orders, measures match latency, and prints stats tables/results.
+5.  **Serialize Messages:** `protocol::codec` can encode submit/cancel/trade/stats/error packets; live socket I/O is not implemented in this repo snapshot.
 
 ## 🧩 What's in the Box (and What's Not)
 
