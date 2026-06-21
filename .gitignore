@@ -23,3 +23,4 @@ target
 local-*.sh
 
 perf-data/
+*.py
